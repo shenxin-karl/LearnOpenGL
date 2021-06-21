@@ -3,4 +3,6 @@
 /glfw
 /assimp
 /out
-
+/glm
+/.gitignore
+/stb
