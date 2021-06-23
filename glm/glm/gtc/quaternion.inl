@@ -163,7 +163,7 @@ namespace glm
 	GLM_FUNC_QUALIFIER qua<T, Q> quatLookAt(vec<3, T, Q> const& direction, vec<3, T, Q> const& up)
 	{
 #		if GLM_CONFIG_CLIP_CONTROL & GLM_CLIP_CONTROL_LH_BIT
-			return quatLookAtLH(direction, up);
+			return quatLookAtLH(director, up);
 #		else
 			return quatLookAtRH(direction, up);
 # 		endif

@@ -14,6 +14,9 @@
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
+#include <sstream>
+#include <string_view>
+#include <filesystem>
 
 #include <stb_image.h>
 
@@ -28,3 +31,23 @@
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
+
+
+struct Vertex;
+struct Texture;
+struct ImageInfo;
+
+class Loader;
+class Mesh;
+class Model;
+class Shader;
+
+using uint = unsigned int;
+
+#include "loader.h"
+#include "mesh.h"
+#include "model.h"
+#include "shader.h"
+#include "camera.h"
+#include "utility.h"
+#include "scene.h"
