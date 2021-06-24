@@ -103,7 +103,7 @@ void Scene::blinn_phong() {
 	glm::vec3 light_dir = glm::normalize(glm::vec3(0.5f, 0.5f, 0.f));
 	blinn_phong_shader.use();
 	glBindTexture(GL_TEXTURE_2D, diffuse_map);
-	blinn_phong_shader.set_uniform("diffuse_map1", diffuse_map);
+	blinn_phong_shader.set_uniform("diffuse_map1", 0);
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
@@ -118,6 +118,45 @@ void Scene::blinn_phong() {
 		blinn_phong_shader.set_uniform("light_dir", light_dir);
 		blinn_phong_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
 		model_ptr->draw(blinn_phong_shader);
+		glfwSwapBuffers(window);
+	}
+}
+
+void Scene::normal_mapping() {
+	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
+	GLuint diffuse_map = Loader::load_texture2d("resources/test_plane/brickwall.jpg");
+	GLuint normal_map = Loader::load_texture2d("resources/test_plane/brickwall_normal.jpg");
+	Shader normal_mapping_shader("shader/normal_mapping/normal_mapping.vert", "shader/normal_mapping/normal_mapping.frag");
+	if (!normal_mapping_shader) {
+		std::cerr << "Failed initialize normal_mapping_shader" << std::endl;
+		return;
+	}
+
+	glm::vec3 light_dir = glm::normalize(glm::vec3(0.5f, 0.5f, 0.f));
+	normal_mapping_shader.use();
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, diffuse_map);
+	normal_mapping_shader.set_uniform("diffuse_map1", 0);
+	glActiveTexture(GL_TEXTURE1);
+	glBindTexture(GL_TEXTURE_2D, normal_map);
+	normal_mapping_shader.set_uniform("normal_map1", 1);
+
+	glEnable(GL_DEPTH_TEST);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClearColor(0.1f, 0.1f, 0.1f, 1.f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		normal_mapping_shader.use();
+		normal_mapping_shader.set_uniform("model", glm::rotate(glm::mat4(1.f), glm::radians(-70.f), glm::vec3(1, 0, 0)));
+		normal_mapping_shader.set_uniform("view", camera_ptr->get_view());
+		normal_mapping_shader.set_uniform("projection", camera_ptr->get_projection());
+		normal_mapping_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
+
+		glm::mat4 light_rotate = glm::rotate(glm::mat4(1.f), float(glm::radians(glfwGetTime() * 5.f)), glm::vec3(0, 1, 0));
+		glm::vec3 new_light_dir = light_rotate * glm::vec4(light_dir, 1.f);
+		normal_mapping_shader.set_uniform("light_dir", new_light_dir);
+		plane_ptr->draw(normal_mapping_shader);
+		CheckError();
 		glfwSwapBuffers(window);
 	}
 }

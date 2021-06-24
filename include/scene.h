@@ -34,4 +34,5 @@ public:
 	inline static std::unordered_map<GLFWwindow *, Scene *> scene_mapping;	
 public:
 	void blinn_phong();
+	void normal_mapping();
 };

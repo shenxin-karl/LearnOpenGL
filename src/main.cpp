@@ -14,5 +14,6 @@ int main(void) {
 		SetCurrentDirectory(new_path.c_str());
 	}
 
-	blinn_phong();
+	//blinn_phong();
+	normal_mapping();
 }

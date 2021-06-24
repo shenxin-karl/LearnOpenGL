@@ -1,6 +1,6 @@
 #include "common.h"
 
-void check_error(const char *file, int line) noexcept {
+void _check_error(const char *file, int line) noexcept {
 	auto error_code = glGetError();
 	switch (error_code) {
 	case GL_INVALID_ENUM:
@@ -52,8 +52,8 @@ GLFWwindow *create_window(int width, int height, const std::string &title) {
 	return window;
 }
 
-constexpr int g_width = 500;
-constexpr int g_height = 500;
+constexpr int g_width = 600;
+constexpr int g_height = 600;
 constexpr float g_aspect = float(g_width) / float(g_height);
 constexpr float g_near = 0.1f;
 constexpr float g_far = 1000.f;
@@ -69,6 +69,18 @@ void blinn_phong() {
 	camera_ptr->set_aspect(g_aspect);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
 	scene.blinn_phong();
+	glfwDestroyWindow(window);
+}
+
+void normal_mapping() {
+	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(-5, 0, 0);
+	glm::vec3 look_up(0, 1, 0);
+	glm::vec3 look_at(0, 0, 0);
+	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
+	camera_ptr->set_aspect(g_aspect);
+	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
+	scene.normal_mapping();
 	glfwDestroyWindow(window);
 }
 

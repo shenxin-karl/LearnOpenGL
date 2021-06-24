@@ -21,6 +21,29 @@ std::unique_ptr<Model> Loader::load_model(const std::string &path) {
 	return model_ptr;
 }	
 
+std::unique_ptr<Model> Loader::create_test_plane() {
+	std::unique_ptr<Model> model_ptr = std::make_unique<Model>();
+
+	std::vector<Vertex> vertices = {
+		Vertex{ glm::vec3(-1.0,  1.0, 0.0), glm::vec2(0.0, 1.0) },		// 左上角
+		Vertex{ glm::vec3(-1.0, -1.0, 0.0), glm::vec2(0.0, 0.0) },		// 左下角
+		Vertex{ glm::vec3( 1.0, -1.0, 0.0), glm::vec2(1.0, 0.0) },		// 右下角
+		Vertex{ glm::vec3( 1.0,  1.0, 0.0), glm::vec2(1.0, 1.0) },		// 右上角
+	};
+
+	std::vector<uint> indices = {
+		0, 1, 2,
+		0, 2, 3,
+	};
+
+	generate_normal(vertices, indices);
+	generate_tangent(vertices, indices);
+	Mesh mesh(std::move(vertices), std::move(indices), {});
+	model_ptr->meshs.push_back(std::move(mesh));
+	model_ptr->directory = "create_test_plane";
+	return model_ptr;
+}
+
 Loader::ImageCacheRecycle::~ImageCacheRecycle() {
 	return;
 	for (auto &&[_, ptr] : image_cache) {
@@ -47,6 +70,59 @@ const std::shared_ptr<ImageInfo> Loader::load_image(const std::string &path) {
 
 	image_cache.insert(std::make_pair(path, res));
 	return res;
+}
+
+void Loader::generate_normal(std::vector<Vertex> &vertice, const std::vector<uint> &indices) {
+	if (indices.size() < 3)
+		return;
+
+	std::vector<glm::vec3> temp_normal(vertice.size(), glm::vec3(0));
+	size_t limit = indices.size() - 2;
+	for (size_t i = 0; i < limit; i += 3) {
+		Vertex &v1 = vertice[indices[i+0]];
+		Vertex &v2 = vertice[indices[i+1]];
+		Vertex &v3 = vertice[indices[i+2]];
+		glm::vec3 edge1 = v2.position - v1.position;
+		glm::vec3 edge2 = v3.position - v1.position;
+		glm::vec3 normal = glm::cross(edge1, edge2);
+		for (size_t j = 0; j < 3; ++j)
+			temp_normal[indices[i+j]] += normal;
+	}
+
+	for (size_t i = 0; i < vertice.size(); ++i) {
+		glm::vec3 normal = glm::normalize(temp_normal[i]);
+		vertice[i].normal = normal;
+	}
+}
+
+void Loader::generate_tangent(std::vector<Vertex> &vertice, const std::vector<uint> &indices) {
+	if (indices.size() < 3)
+		return;
+
+	std::vector<glm::vec3> temp_tangent(vertice.size(), glm::vec3(0));
+	size_t limit = indices.size() - 2;
+	for (size_t i = 0; i < limit; i += 3) {
+		const Vertex &v1 = vertice[indices[i+0]];
+		const Vertex &v2 = vertice[indices[i+1]];
+		const Vertex &v3 = vertice[indices[i+2]];
+		glm::vec3 edge1 = v2.position - v1.position;
+		glm::vec3 edge2 = v3.position - v1.position;
+		float t1 = v2.texcoord.t - v1.texcoord.t;
+		float t2 = v3.texcoord.t - v1.texcoord.t;
+		glm::vec3 tangent = (t2 * edge1) - (t1 * edge2);
+		for (size_t j = 0; j < 3; ++j)
+			temp_tangent[indices[i+j]] += tangent;
+	}
+
+	for (size_t i = 0; i < vertice.size(); ++i) {
+		Vertex &v = vertice[i];
+		glm::vec3 t = temp_tangent[i];
+		t -= v.normal * dot(t, v.normal);		// 正交修正
+		t = glm::normalize(t);
+		v.tangent = t;
+		v.bitangent = cross(v.normal, t);
+		std::cout << "tangent: " << glm::to_string(v.tangent) << " " << "bitangent: " << glm::to_string(v.bitangent) << std::endl;
+	}
 }
 
 GLuint Loader::load_texture2d(const std::string &path, std::array<int, 4> flag) {

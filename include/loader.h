@@ -12,7 +12,10 @@ struct ImageInfo {
 class Loader {
 public:
 	static std::unique_ptr<Model> load_model(const std::string &path);
+	static std::unique_ptr<Model> create_test_plane();
 	static const std::shared_ptr<ImageInfo> load_image(const std::string &path);
+	static void generate_normal(std::vector<Vertex> &vertice, const std::vector<uint> &indices);
+	static void generate_tangent(std::vector<Vertex> &vertice, const std::vector<uint> &indices);
 
 	constexpr static std::array<int, 4> load_texture2d_default_flag = {
 		GL_REPEAT,						// WRAP_S
