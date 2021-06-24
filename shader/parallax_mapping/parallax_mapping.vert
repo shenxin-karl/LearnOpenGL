@@ -10,7 +10,7 @@ out VS_OUT {
 	vec3	position;
 	vec2	texcoord;
 	vec3	tangent_light_dir;
-	vec3	tangent_view_dir;
+	vec3	tangent_view_pos;
 	vec3	tangent_position;
 } vs_out;
 
@@ -28,10 +28,10 @@ void main() {
 	vec3 N = normalize(normal_matrix * normal);
 	mat3 TBN = transpose(mat3(T, B, N));
 
-	vec3 model_pos = vec3(model * vec4(position, 1.f));
-	vs_out.position = model_pos;
+	vec3 model_position = vec3(model * vec4(position, 1.0));
+	vs_out.position = model_position;
 	vs_out.texcoord = texcoord;
-	vs_out.tangent_light_dir = normalize(TBN * light_dir);
-	vs_out.tangent_view_dir = normalize(TBN * (eye_pos - model_pos));
-	vs_out.tangent_position = TBN * model_pos;
+	vs_out.tangent_light_dir = TBN * light_dir;
+	vs_out.tangent_view_pos = TBN * eye_pos;
+	vs_out.tangent_position = TBN * model_position;
 }

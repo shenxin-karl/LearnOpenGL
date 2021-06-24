@@ -8,3 +8,4 @@ void _check_error(const char *file, int line) noexcept;
 GLFWwindow *create_window(int width, int height, const std::string &title);
 void blinn_phong();
 void normal_mapping();
+void parallax_mapping();

@@ -15,5 +15,6 @@ int main(void) {
 	}
 
 	//blinn_phong();
-	normal_mapping();
+	//normal_mapping();
+	parallax_mapping();
 }
