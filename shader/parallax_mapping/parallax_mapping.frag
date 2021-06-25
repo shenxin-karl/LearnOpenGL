@@ -22,7 +22,7 @@ vec2 parallax_mapping(sampler2D depth_map, vec2 texcoord, vec3 view_dir) {
 }
 
 
-vec2 parallax_mapping1(sampler2D depth_map, vec2 texcoord, vec3 view_dir) {
+vec2 step_parallax_mapping(sampler2D depth_map, vec2 texcoord, vec3 view_dir) {
 	float depth = texture(depth_map, texcoord).r;
 	vec2 p = view_dir.xy / view_dir.z * (depth * displacement_scale);
 	const float min_layers = 8;
@@ -41,9 +41,34 @@ vec2 parallax_mapping1(sampler2D depth_map, vec2 texcoord, vec3 view_dir) {
 	return texcoord;
 }
 
+vec2 parallax_occlusion_mapping(sampler2D depth_map, vec2 texcoord, vec3 view_dir) {
+	float depth = texture(depth_map, texcoord).r;
+	vec2 p = view_dir.xy / view_dir.z * (depth * displacement_scale);
+	const float min_layers = 8;
+	const float max_layers = 32;
+	float layers = mix(min_layers, max_layers, abs(view_dir.z));
+
+	float delta_depth = 1 / layers;
+	vec2 delta_p = p / layers;
+	float curr_depth = 1.0;
+	float expect_depth = 0.0;
+	while (curr_depth > expect_depth) {
+		expect_depth += delta_depth;
+		texcoord -= delta_p;
+		curr_depth = texture(depth_map, texcoord).r;
+	}
+
+	vec2 prev_texcoord = texcoord + delta_p;
+	float prev_depth = texture(depth_map, prev_texcoord).r;
+	float after_depth = expect_depth - curr_depth;
+	float before_depth = prev_depth - (expect_depth - delta_depth);
+	float weight = after_depth / (after_depth + before_depth);
+	return mix(texcoord, prev_texcoord, weight);
+}
+
 void main() {
 	vec3 view_dir = normalize(fs_in.tangent_view_pos - fs_in.tangent_position);
-	vec2 texcoord = parallax_mapping1(displacement_map1, fs_in.texcoord, view_dir);
+	vec2 texcoord = parallax_occlusion_mapping(displacement_map1, fs_in.texcoord, view_dir);
 	if (texcoord.s < 0 || texcoord.s > 1 || texcoord.t < 0 || texcoord.t > 1)
 		discard;
 
