@@ -125,7 +125,31 @@ void Loader::generate_tangent(std::vector<Vertex> &vertice, const std::vector<ui
 	}
 }
 
-GLuint Loader::load_texture2d(const std::string &path, std::array<int, 4> flag) {
+GLuint Loader::load_texture2d(const std::string &path) {
+	constexpr static std::array<int, 6> flag = {
+		GL_REPEAT,						// WRAP_S
+		GL_REPEAT,						// WRAP_T
+		GL_LINEAR_MIPMAP_LINEAR,		// GL_TEXTURE_MIN_FILTER	
+		GL_NEAREST,						// GL_TEXTURE_MAG_FILTER
+		GL_RGB,		
+		GL_RGBA,						
+	};
+	return load_texture2d_impl(path, flag);
+}
+
+GLuint Loader::load_texture2ds(const std::string &path) {
+	constexpr static std::array<int, 6> flag = {
+		GL_REPEAT,						// WRAP_S
+		GL_REPEAT,						// WRAP_T
+		GL_LINEAR_MIPMAP_LINEAR,		// GL_TEXTURE_MIN_FILTER	
+		GL_NEAREST,						// GL_TEXTURE_MAG_FILTER
+		GL_SRGB,
+		GL_SRGB_ALPHA,	
+	};
+	return load_texture2d_impl(path, flag);
+}
+
+GLuint Loader::load_texture2d_impl(const std::string &path, std::array<int, 6> flag) {
 	if (auto iter = texture2d_cache.find(path); iter != texture2d_cache.end())
 		return iter->second;
 
@@ -145,8 +169,17 @@ GLuint Loader::load_texture2d(const std::string &path, std::array<int, 4> flag) 
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, flag[2]);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, flag[3]);
 
-		auto type = image_ptr->channel == 3 ? GL_RGB : GL_RGBA;
-		glTexImage2D(GL_TEXTURE_2D, 0, type, image_ptr->width, image_ptr->height, 0, type, GL_UNSIGNED_BYTE, image_ptr->data);
+		//auto type = image_ptr->channel == 3 ? flag[4] : flag[5];
+		int type = 0;
+		int store_type = 0;
+		if (image_ptr->channel == 3) {
+			type = GL_RGB;
+			store_type = flag[4];
+		} else {
+			type = GL_RGBA;
+			store_type = flag[5];
+		}
+		glTexImage2D(GL_TEXTURE_2D, 0, store_type, image_ptr->width, image_ptr->height, 0, type, GL_UNSIGNED_BYTE, image_ptr->data);
 		glGenerateMipmap(GL_TEXTURE_2D);
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
@@ -222,7 +255,11 @@ std::vector<Texture> Loader::load_material_textures(aiMaterial *material, aiText
 		aiString str;
 		material->GetTexture(type, uint(i), &str);
 		std::string path = model_ptr->directory + "/" + str.C_Str();
-		GLuint texture_obj = load_texture2d(path);
+		GLuint texture_obj;
+		if (type == aiTextureType_DIFFUSE)
+			texture_obj = load_texture2ds(path);
+		else
+			texture_obj = load_texture2d(path);
 		textures.emplace_back(texture_obj, var_name, type);
 	}
 	return textures;

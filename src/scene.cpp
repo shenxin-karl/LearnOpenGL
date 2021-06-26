@@ -163,7 +163,7 @@ void Scene::normal_mapping() {
 
 void Scene::parallax_mapping() {
 	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
-	GLuint diffuse_map = Loader::load_texture2d("resources/test_plane/bricks2.jpg");
+	GLuint diffuse_map = Loader::load_texture2ds("resources/test_plane/bricks2.jpg");
 	GLuint normal_map = Loader::load_texture2d("resources/test_plane/bricks2_normal.jpg");
 	GLuint displacement_map = Loader::load_texture2d("resources/test_plane/bricks2_disp.jpg");
 	Shader parallax_mapping_shader("shader/parallax_mapping/parallax_mapping.vert", "shader/parallax_mapping/parallax_mapping.frag");
@@ -188,7 +188,7 @@ void Scene::parallax_mapping() {
 	glEnable(GL_DEPTH_TEST);
 	while (!glfwWindowShouldClose(window)) {
 		poll_event();
-		glClearColor(0.1f, 0.1f, 0.1f, 1.f);
+		glClearColor(0.0f, 0.0f, 0.0f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		parallax_mapping_shader.use();
 		//parallax_mapping_shader.set_uniform("model", glm::rotate(glm::mat4(1.f), glm::radians(-70.f), glm::vec3(1, 0, 0)));

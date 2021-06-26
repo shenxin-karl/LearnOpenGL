@@ -16,15 +16,10 @@ public:
 	static const std::shared_ptr<ImageInfo> load_image(const std::string &path);
 	static void generate_normal(std::vector<Vertex> &vertice, const std::vector<uint> &indices);
 	static void generate_tangent(std::vector<Vertex> &vertice, const std::vector<uint> &indices);
-
-	constexpr static std::array<int, 4> load_texture2d_default_flag = {
-		GL_REPEAT,						// WRAP_S
-		GL_REPEAT,						// WRAP_T
-		GL_LINEAR_MIPMAP_LINEAR,		// GL_TEXTURE_MIN_FILTER	
-		GL_NEAREST,						// GL_TEXTURE_MAG_FILTER
-	};
-	static GLuint load_texture2d(const std::string &path, std::array<int, 4> flag = load_texture2d_default_flag);
+	static GLuint load_texture2d(const std::string &path);
+	static GLuint load_texture2ds(const std::string &path);
 private:
+	static GLuint load_texture2d_impl(const std::string &path, std::array<int, 6> flag);
 	struct ImageCacheRecycle {
 		~ImageCacheRecycle();
 	};

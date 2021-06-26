@@ -77,16 +77,18 @@ void main() {
 	vec3 diffuse_color = texture(diffuse_map1, texcoord).rgb;
 
 	// ambient
-	vec3 ambient = diffuse_color * 0.2;
+	vec3 ambient = diffuse_color * 0.1;
 
 	// diffuse
 	float diff = max(dot(light_dir, normal), 0.0);
-	vec3 diffuse = diff * 0.8 * diffuse_color;
+	vec3 diffuse = diff * 0.5 * diffuse_color;
 
 	// specular
 	vec3 half_vec = normalize(light_dir + view_dir);
 	float spec = pow(max(dot(half_vec, normal), 0.0), 64.0);
-	vec3 specular = spec * 0.3 * diffuse_color;
+	vec3 specular = spec * 0.1 * diffuse_color;
 
-	frag_color = vec4(ambient + diffuse + specular, 1.0);
+	vec3 color = ambient + diffuse + specular;
+	color = pow(color, vec3(1 / 2.2));
+	frag_color = vec4(color, 1.0);
 }
