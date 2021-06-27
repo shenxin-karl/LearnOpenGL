@@ -206,3 +206,125 @@ void Scene::parallax_mapping() {
 	}
 }
 
+void Scene::shadow_mapping() {
+	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
+	std::unique_ptr<Model> cube_ptr = Loader::create_trest_cube();
+	GLuint plane_diffuse_map = Loader::load_texture2ds("resources/test_plane/wood.png");
+	GLuint cube_diffuse_map = Loader::load_texture2ds("resources/test_cube/container2.png");
+
+	Shader shadow_mapping_shader("shader/shadow_mapping/shadow_mapping.vert", "shader/shadow_mapping/shadow_mapping.frag");
+	if (!shadow_mapping_shader) {
+		std::cerr << "Failed initialize shadow_mapping_shader" << std::endl;
+		return;
+	}
+
+	Shader sample_depth_shader("shader/shadow_mapping/sample_depth.vert", "shader/shadow_mapping/sample_depth.frag");
+	if (!sample_depth_shader) {
+		std::cerr << "Failed initialize sample_depth_shader" << std::endl;
+		return;
+	}
+
+	shadow_mapping_shader.use();
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, plane_diffuse_map);
+	glm::vec3 light_dir = glm::normalize(glm::vec3(-19.707130, 12.483460, -17.730694));
+
+	glm::mat4 plane_scale = glm::scale(glm::mat4(1.f), glm::vec3(10.f, 1, 10.f));
+	glm::mat4 plane_trans_matrix = glm::rotate(plane_scale, glm::radians(90.f), glm::vec3(1, 0, 0));
+	glm::mat4 cube_trans = glm::translate(glm::mat4(1.f), glm::vec3(0, 1, 0));
+
+	// 构建 fbo
+	constexpr int SHADOW_WIDTH = 1024;
+	constexpr int SHADOW_HEIGHT = 1024;
+	GLuint depth_fbo;
+	GLuint depth_map;
+	glGenFramebuffers(1, &depth_fbo);
+	glGenTextures(1, &depth_map);
+	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+	{
+		// 为纹理对象分配内存
+		glBindTexture(GL_TEXTURE_2D, depth_map);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_map, 0);
+		glDrawBuffer(GL_NONE);
+		glReadBuffer(GL_NONE);
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			std::cerr << "depth_fbo is not complete!" << std::endl;
+			return;
+		}
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);	
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClearColor(0.f, 0.f, 0.f, 1.f);
+
+		// 构建光空间矩阵
+		constexpr float near = 10.f;
+		constexpr float far = 100.f;
+		constexpr float left = -20.f;
+		constexpr float right = 20.f;
+		constexpr float top = 20.f;
+		constexpr float bottom = -20.f;
+		glm::mat4 light_view = glm::lookAt(light_dir * 30.f, glm::vec3(0), glm::vec3(0, 1, 0));
+		glm::mat4 light_projection = glm::ortho(left, right, bottom, top, near, far);
+		glm::mat4 light_space_matrix = light_projection * light_view;
+		// 渲染深度贴图
+		glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+		{
+			glCullFace(GL_FRONT);		// 渲染场景深度贴图使用正面剔除, 避免悬浮问题出现
+			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+			glClear(GL_DEPTH_BUFFER_BIT);
+
+			sample_depth_shader.use();
+			sample_depth_shader.set_uniform("light_space_matrix", light_space_matrix);
+			sample_depth_shader.set_uniform("model", plane_trans_matrix);
+			plane_ptr->draw(sample_depth_shader);
+
+			sample_depth_shader.set_uniform("model", cube_trans);
+			cube_ptr->draw(sample_depth_shader);
+			glCullFace(GL_BACK);		// 恢复背面剔除
+		}
+
+	// 绘制阴影场景
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, plane_diffuse_map);
+		
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, depth_map);
+
+		shadow_mapping_shader.use();
+		shadow_mapping_shader.set_uniform("diffuse_map1", 0);
+		shadow_mapping_shader.set_uniform("depth_map", 1);
+		shadow_mapping_shader.set_uniform("light_space_matrix", light_space_matrix);
+
+		shadow_mapping_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
+		shadow_mapping_shader.set_uniform("view", camera_ptr->get_view());
+		shadow_mapping_shader.set_uniform("projection", camera_ptr->get_projection());
+		shadow_mapping_shader.set_uniform("light_dir", light_dir);
+
+		shadow_mapping_shader.set_uniform("model", plane_trans_matrix);
+		plane_ptr->draw(shadow_mapping_shader);
+
+		shadow_mapping_shader.set_uniform("model", cube_trans);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, cube_diffuse_map);
+		shadow_mapping_shader.set_uniform("diffuse_map1", 0);
+		cube_ptr->draw(shadow_mapping_shader);
+
+		glfwSwapBuffers(window);
+	}
+
+	glDeleteFramebuffers(1, &depth_fbo);
+	glDeleteTextures(1, &depth_map);
+}
+

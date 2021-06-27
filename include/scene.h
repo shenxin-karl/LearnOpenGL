@@ -36,4 +36,5 @@ public:
 	void blinn_phong();
 	void normal_mapping();
 	void parallax_mapping();
+	void shadow_mapping();
 };

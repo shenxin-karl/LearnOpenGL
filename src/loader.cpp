@@ -32,8 +32,8 @@ std::unique_ptr<Model> Loader::create_test_plane() {
 	};
 
 	std::vector<uint> indices = {
-		0, 1, 2,
-		0, 2, 3,
+		0, 2, 1,
+		0, 3, 2,
 	};
 
 	generate_normal(vertices, indices);
@@ -41,6 +41,27 @@ std::unique_ptr<Model> Loader::create_test_plane() {
 	Mesh mesh(std::move(vertices), std::move(indices), {});
 	model_ptr->meshs.push_back(std::move(mesh));
 	model_ptr->directory = "create_test_plane";
+	return model_ptr;
+}
+
+
+std::unique_ptr<Model> Loader::create_trest_cube() {
+	std::unique_ptr<Model> model_ptr = std::make_unique<Model>();
+	std::vector<Vertex> vertices = {
+		#include "test_cube/vertex.txt"
+	};
+
+	std::vector<uint> indices;
+	indices.reserve(vertices.size());
+	std::generate_n(std::back_inserter(indices), vertices.size(), [n = 0]() mutable {
+		return n++;
+	});
+
+	generate_normal(vertices, indices);
+	generate_tangent(vertices, indices);
+	Mesh mesh(std::move(vertices), std::move(indices), {});
+	model_ptr->meshs.push_back(std::move(mesh));
+	model_ptr->directory = "create_trest_cube";
 	return model_ptr;
 }
 
