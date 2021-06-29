@@ -19,6 +19,7 @@ target_include_directories(LearnOpenGL PUBLIC
 	${PROJECT_SOURCE_DIR}/glad/include
 	${PROJECT_SOURCE_DIR}/stb/include
 	${PROJECT_SOURCE_DIR}/glm
+	${PROJECT_SOURCE_DIR}/resources
 	${PROJECT_SOURCE_DIR}/include
 	${PROJECT_SOURCE_DIR}/shader
 )
