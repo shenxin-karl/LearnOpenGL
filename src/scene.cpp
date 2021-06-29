@@ -186,6 +186,7 @@ void Scene::parallax_mapping() {
 	parallax_mapping_shader.set_uniform("displacement_scale", 0.1f);
 
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_MULTISAMPLE);
 	while (!glfwWindowShouldClose(window)) {
 		poll_event();
 		glClearColor(0.0f, 0.0f, 0.0f, 1.f);

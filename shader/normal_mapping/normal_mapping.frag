@@ -26,7 +26,6 @@ void main() {
 	float diff = max(dot(normal, light_dir), 0);
 	vec3 diffuse = diff * 0.5 * diffuse_color;
 
-
 	// specular
 	vec3 half_vec = normalize(view_dir + light_dir);
 	float spec = pow(max(dot(half_vec, normal), 0.0), 64);
