@@ -20,13 +20,13 @@ void main() {
         for (int i = 0; i < 5; ++i) {
             vec2 offset = vec2(tex_offset.x, 0) * i;
             result += texture(color_map, our_texcoord + offset).rgb * weight[i];
-            result -= texture(color_map, our_texcoord - offset).rgb * weight[i];
+            result += texture(color_map, our_texcoord - offset).rgb * weight[i];
         }
     } else {
         for (int i = 0; i < 5; ++i) {
             vec2 offset = vec2(0, tex_offset.y) * i;
             result += texture(color_map, our_texcoord + offset).rgb * weight[i];
-            result -= texture(color_map, our_texcoord - offset).rgb * weight[i];
+            result += texture(color_map, our_texcoord - offset).rgb * weight[i];
         }
     }
     frag_color = vec4(result, 1.0);

@@ -167,7 +167,6 @@ void Loader::generate_tangent(std::vector<Vertex> &vertice, const std::vector<ui
 		t = glm::normalize(t);
 		v.tangent = t;
 		v.bitangent = cross(v.normal, t);
-		std::cout << "tangent: " << glm::to_string(v.tangent) << " " << "bitangent: " << glm::to_string(v.bitangent) << std::endl;
 	}
 }
 

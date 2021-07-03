@@ -10,8 +10,8 @@ void main() {
 	vec3 color1 = texture(color_map, our_texcoord).rgb;
 	vec3 color2 = texture(birght_color_map, our_texcoord).rgb;
 
-	// vec3 color = color1 + color2;
-	vec3 color = color2;
+	vec3 color = color1 + color2;
+	// vec3 color = color1;
 	color = color / (color + vec3(1));
 
 	const float gamma = 2.2;

@@ -1,6 +1,6 @@
 #include "common.h"
 
-void _check_error(const char *file, int line) noexcept {
+GLenum _check_error(const char *file, int line) noexcept {
 	auto error_code = glGetError();
 	switch (error_code) {
 	case GL_INVALID_ENUM:
@@ -27,6 +27,7 @@ void _check_error(const char *file, int line) noexcept {
 	default:
 		break;
 	}
+	return error_code;
 }
 
 GLFWwindow *create_window(int width, int height, const std::string &title) {
@@ -52,7 +53,7 @@ GLFWwindow *create_window(int width, int height, const std::string &title) {
 	return window;
 }
 
-constexpr int g_width = 600;
+constexpr int g_width = 800;
 constexpr int g_height = 600;
 constexpr float g_aspect = float(g_width) / float(g_height);
 constexpr float g_near = 0.1f;

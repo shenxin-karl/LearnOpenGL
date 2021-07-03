@@ -28,19 +28,10 @@ void main() {
 		float cos_theta = max(dot(light_dir, normal), 0.0);
 		color += light_color[i] * attenuation * cos_theta;
 	}
-
 	color *= diffuse_color;
 
-#if 0
-	// HDR
-	color = color / (color + vec3(1));
-	const float gamma = 2.2;
-	frag_color = vec4(pow(color, vec3(1 / gamma)), 1.0);
-#else
 	frag_color = vec4(color, 1.0);
-#endif
-	
 	float brightness = dot(frag_color.rgb, vec3(0.2126, 0.7152, 0.0722));
-	if (brightness > 0)
-		bright_color = frag_color;
+	if (brightness > 1)
+		bright_color = vec4(color, 1.0);
 }
