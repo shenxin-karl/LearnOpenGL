@@ -65,6 +65,31 @@ std::unique_ptr<Model> Loader::create_trest_cube() {
 	return model_ptr;
 }
 
+std::unique_ptr<Model> Loader::create_quad() {
+	std::vector<Vertex> vertices = {
+		Vertex{ glm::vec3(-1.0f,  1.0f, 0.f), glm::vec2(0.0f, 1.0f) },		// вСио╫г
+		Vertex{ glm::vec3(-1.0f, -1.0f, 0.f), glm::vec2(0.0f, 0.0f) },		// вСоб╫г
+		Vertex{ glm::vec3( 1.0f, -1.0f, 0.f), glm::vec2(1.0f, 0.0f) },		// сроб╫г
+
+		Vertex{ glm::vec3(-1.0f,  1.0f, 0.f), glm::vec2(0.0f, 1.0f) },		// вСио╫г
+		Vertex{ glm::vec3( 1.0f, -1.0f, 0.f), glm::vec2(1.0f, 0.0f) },		// сроб╫г
+		Vertex{ glm::vec3( 1.0f,  1.0f, 0.f), glm::vec2(1.0f, 1.0f) },		// срио╫г
+	};	
+
+	std::vector<uint> indices;
+	indices.reserve(vertices.size());
+	std::generate_n(std::back_inserter(indices), vertices.size(), [n = 0]() mutable {
+		return n++;
+	});
+	generate_normal(vertices, indices);
+	generate_tangent(vertices, indices);
+	Mesh mesh(std::move(vertices), std::move(indices), {});
+	std::unique_ptr<Model> model_ptr = std::make_unique<Model>();
+	model_ptr->meshs.push_back(std::move(mesh));
+	model_ptr->directory = "create_quad";
+	return model_ptr;
+}
+
 Loader::ImageCacheRecycle::~ImageCacheRecycle() {
 	return;
 	for (auto &&[_, ptr] : image_cache) {

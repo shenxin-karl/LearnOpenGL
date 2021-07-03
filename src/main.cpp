@@ -18,5 +18,6 @@ int main(void) {
 	//blinn_phong();
 	//normal_mapping();
 	//parallax_mapping();
-	shadow_mapping();
+	//shadow_mapping();
+	bloom();
 }

@@ -192,8 +192,8 @@ void Scene::parallax_mapping() {
 		glClearColor(0.0f, 0.0f, 0.0f, 1.f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		parallax_mapping_shader.use();
-		//parallax_mapping_shader.set_uniform("model", glm::rotate(glm::mat4(1.f), glm::radians(-70.f), glm::vec3(1, 0, 0)));
-		parallax_mapping_shader.set_uniform("model", glm::mat4(1.f));
+		parallax_mapping_shader.set_uniform("model", glm::rotate(glm::mat4(1.f), glm::radians(90.f), glm::vec3(1, 0, 0)));
+		//parallax_mapping_shader.set_uniform("model", glm::mat4(1.f));
 		parallax_mapping_shader.set_uniform("view", camera_ptr->get_view());
 		parallax_mapping_shader.set_uniform("projection", camera_ptr->get_projection());
 		parallax_mapping_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
@@ -327,5 +327,222 @@ void Scene::shadow_mapping() {
 
 	glDeleteFramebuffers(1, &depth_fbo);
 	glDeleteTextures(1, &depth_map);
+}
+
+void Scene::bloom() {
+	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
+	std::unique_ptr<Model> cube_ptr = Loader::create_trest_cube();
+	std::unique_ptr<Model> quad_ptr = Loader::create_quad();
+	GLuint plane_diffuse_map = Loader::load_texture2ds("resources/test_plane/wood.png");
+	GLuint cube_diffuse_map = Loader::load_texture2ds("resources/test_cube/container2.png");
+	
+	Shader single_color_shader("shader/bloom/single_color.vert", "shader/bloom/single_color.frag");
+	if (!single_color_shader) {
+		std::cerr << "Failed initialize single_color_shader" << std::endl;
+		return;
+	}
+
+	Shader bloom_shader("shader/bloom/bloom.vert", "shader/bloom/bloom.frag");
+	if (!bloom_shader) {
+		std::cerr << "Failed initialize bloom_shader" << std::endl;
+		return;
+	}
+
+	Shader bloom_final_shader("shader/bloom/bloom_final.vert", "shader/bloom/bloom_final.frag");
+	if (!bloom_final_shader) {
+		std::cerr << "Failed initialize bloom_final_shader" << std::endl;
+		return;
+	}
+
+	Shader blur_shader("shader/bloom/blur.vert", "shader/bloom/blur.frag");
+	if (!blur_shader) {
+		std::cerr << "Failed initialize blur_shader" << std::endl;
+		return;
+	}
+	
+	glm::mat4 light_scale = glm::scale(glm::mat4(1), glm::vec3(1.f, 1.f, 1.f));
+	std::vector<glm::vec3> light_pos = {
+		glm::vec3(2, 3, 5),
+		glm::vec3(-1, 4, 2),
+		glm::vec3(-5, 5, 0),
+		glm::vec3(4, 4, -3),
+	};
+	std::vector<glm::vec3> light_color = {
+		glm::vec3(5.0f,   5.0f,  5.0f),
+		glm::vec3(10.0f,  0.0f,  0.0f),
+		glm::vec3(0.0f,   0.0f,  15.0f),
+		glm::vec3(0.0f,   5.0f,  0.0f),
+	};
+
+	glm::mat4 plane_scale = glm::scale(glm::mat4(1.0), glm::vec3(10, 1, 10));
+	glm::mat4 plane_trans = glm::rotate(plane_scale, glm::radians(90.f), glm::vec3(1, 0, 0));
+
+	glm::mat4 cube_scale = glm::scale(glm::mat4(1), glm::vec3(2, 2, 2));
+	std::vector<glm::vec3> cube_pos = {
+		glm::vec3(0, 0.5, 0),
+		glm::vec3(1, 0.5, 4),
+		glm::vec3(4, 0.5, 1),
+		glm::vec3(-4, 0.5, -1),
+	};
+
+	GLuint multi_fbo;
+	GLuint multi_texture[2];
+	GLuint multi_rbo;
+	glGenFramebuffers(1, &multi_fbo);
+	glGenTextures(2, multi_texture);
+	glBindFramebuffer(GL_FRAMEBUFFER, multi_fbo);
+	{
+		for (int i = 0; i < 2; ++i) {
+			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, multi_texture[i]);
+			glTexImage2DMultisample(GL_TEXTURE_2D_MULTISAMPLE, 4, GL_RGB, width, height, GL_TRUE);
+			glBindTexture(GL_TEXTURE_2D_MULTISAMPLE, 0);
+			CheckError();
+				// 绑定到帧缓冲上面
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i,
+				GL_TEXTURE_2D_MULTISAMPLE, multi_texture[i], 0);
+		}
+
+		// 绑定rbo
+		glGenRenderbuffers(1, &multi_rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, multi_rbo);
+		glRenderbufferStorageMultisample(GL_RENDERBUFFER, 4, GL_DEPTH24_STENCIL8, width, height);
+		glBindRenderbuffer(GL_RENDERBUFFER, 0);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, multi_rbo);
+
+		if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+			std::cout << "ERROR::FRAMEBUFFER:: Framebuffer is not complete!" << std::endl;
+			return;
+		}
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	GLuint fbo;
+	GLuint screen_texture[2];
+	glGenFramebuffers(1, &fbo);
+	glGenTextures(2, screen_texture);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	{
+		for (int i = 0; i < 2; ++i) {
+			glBindTexture(GL_TEXTURE_2D, screen_texture[i]);
+			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + i, GL_TEXTURE_2D, screen_texture[i], 0);
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	GLuint pingpong_fbo[2];
+	GLuint pingpong_buffer[2];
+	glGenFramebuffers(2, pingpong_fbo);
+	glGenTextures(2, pingpong_buffer);
+	for (int i = 0; i < 2; ++i) {
+		glBindFramebuffer(GL_FRAMEBUFFER, pingpong_fbo[i]);
+		glBindTexture(GL_TEXTURE_2D, pingpong_buffer[i]);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, pingpong_buffer[i], 0);
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+	}
+
+	glEnable(GL_MULTISAMPLE);	
+	glEnable(GL_CULL_FACE);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+
+		glEnable(GL_DEPTH_TEST);
+		glBindFramebuffer(GL_FRAMEBUFFER, multi_fbo);
+		glClearColor(0.f, 0.f, 0.f, 1.f);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// render light cube
+		single_color_shader.use();
+		single_color_shader.set_uniform("view", camera_ptr->get_view());
+		single_color_shader.set_uniform("projection", camera_ptr->get_projection());
+		for (int i = 0; i < 4; ++i) {
+			glm::mat4 model = glm::translate(light_scale, light_pos[i]);
+			single_color_shader.set_uniform("model", model);
+			single_color_shader.set_uniform("light_color", light_color[i]);
+			cube_ptr->draw(single_color_shader);
+		}
+
+		bloom_shader.use();
+		bloom_shader.set_uniform("model", plane_trans);
+		bloom_shader.set_uniform("view", camera_ptr->get_view());
+		bloom_shader.set_uniform("projection", camera_ptr->get_projection());
+		bloom_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
+		bloom_shader.set_uniform("diffuse_map1", 0);
+		for (int i = 0; i < 4; ++i) {
+			std::string light_pos_var = std::format("light_pos[{}]", i);
+			std::string light_color_var = std::format("light_color[{}]", i);
+			bloom_shader.set_uniform(light_pos_var.c_str(), light_pos[i]);
+			bloom_shader.set_uniform(light_color_var.c_str(), light_color[i]);
+		}
+
+		// render plane
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, plane_diffuse_map);
+		plane_ptr->draw(bloom_shader);
+
+		// render cube
+		glBindTexture(GL_TEXTURE_2D, cube_diffuse_map);
+		bloom_shader.set_uniform("diffuse_map1", 0);
+		for (int i = 0; i < cube_pos.size(); ++i) {
+			glm::mat4 model = glm::translate(cube_scale, cube_pos[i]);
+			bloom_shader.set_uniform("model", model);
+			cube_ptr->draw(bloom_shader);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, multi_fbo);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
+		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_COLOR_BUFFER_BIT, GL_NEAREST);
+
+		// 高斯模糊
+		glDisable(GL_DEPTH_TEST);
+		glClear(GL_COLOR_BUFFER_BIT);
+		blur_shader.use();
+		GLuint blur_texture = screen_texture[1];
+		for (int i = 0; i < 10; ++i) {
+			int curr = i % 2;
+			int next = (i+1) % 2;
+			glBindFramebuffer(GL_FRAMEBUFFER, pingpong_fbo[curr]);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, blur_texture);
+			blur_shader.set_uniform("color_map", 0);
+			blur_shader.set_uniform("horizontal", curr);
+			quad_ptr->draw(blur_shader);
+			blur_texture = pingpong_buffer[curr];
+			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		}
+
+		// 绑定默认的帧缓冲
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glClearColor(0.f, 0.f, 0.f, 1.f);
+		glClear(GL_COLOR_BUFFER_BIT);
+
+		bloom_final_shader.use();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, screen_texture[0]);
+		bloom_final_shader.set_uniform("color_map", 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_2D, blur_texture);
+		bloom_final_shader.set_uniform("birght_color_map", 1);
+		
+		quad_ptr->draw(bloom_final_shader);
+		glfwSwapBuffers(window);
+	}
+
+	glDeleteFramebuffers(1, &multi_fbo);
+	glDeleteTextures(2, multi_texture);
+	glDeleteRenderbuffers(1, &multi_rbo);
+	glDeleteFramebuffers(1, &fbo);
+	glDeleteTextures(2, screen_texture);
+	glDeleteFramebuffers(2, pingpong_fbo);
+	glDeleteTextures(2, pingpong_buffer);
 }
 
