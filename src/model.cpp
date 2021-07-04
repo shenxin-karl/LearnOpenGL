@@ -34,3 +34,7 @@ void Model::show_widgets() {
 	model_ = glm::translate(model_, translate);
 }
 
+const std::vector<Mesh> &Model::get_meshs() {
+	return meshs;
+}
+

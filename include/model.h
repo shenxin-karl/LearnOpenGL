@@ -12,4 +12,5 @@ public:
 	const std::string &get_name() const;
 	void set_model(const glm::mat4 &model);
 	void show_widgets();
+	const std::vector<Mesh> &get_meshs();
 };

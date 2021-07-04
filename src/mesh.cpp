@@ -38,7 +38,7 @@ Mesh::Mesh(std::vector<Vertex> &&_vertices, std::vector<uint> &&_indices, std::v
 	glBindVertexArray(0);
 }
 
-Mesh::Mesh(Mesh &&other) noexcept : VAO(0), VBO(0), EBO(0) {
+Mesh::Mesh(Mesh &&other) noexcept : VAO(0), VBO(0), EBO(0), draw_type_(other.draw_type_) {
 	*this = std::move(other);
 }
 
@@ -69,7 +69,7 @@ void Mesh::draw(Shader &shader) const {
 	}
 
 	glBindVertexArray(VAO);
-	glDrawElements(GL_TRIANGLES, GLsizei(indices.size()), GL_UNSIGNED_INT, nullptr);
+	glDrawElements(draw_type_, GLsizei(indices.size()), GL_UNSIGNED_INT, nullptr);
 	glBindVertexArray(0);
 }
 

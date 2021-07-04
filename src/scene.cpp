@@ -611,46 +611,112 @@ void Scene::bloom() {
 	glDeleteRenderbuffers(2, pingpong_rbo);
 }
 
-void Scene::imgui_test() {
-	std::shared_ptr<Model> cube_ptr = Loader::create_trest_cube();
-	add_model(cube_ptr);
-	GLuint cube_diffuse_map = Loader::load_texture2d("resources/test_cube/container2.png");
-	Shader blinn_shader("shader/blinn_phong/blinn_phong.vert", "shader/blinn_phong/blinn_phong.frag");
-	if (!blinn_shader) {
-		std::cerr << "Failed initialize blinn_shader" << std::endl;
+void Scene::pbr() {
+	auto sphere_ptr = Loader::create_sphere();
+	Shader pbr_shader("shader/pbr/pbr.vert", "shader/pbr/pbr.frag");
+	if (!pbr_shader) {
+		std::cerr << "Failed initialize sample_depth_shader" << std::endl;
 		return;
 	}
+	add_model(sphere_ptr);
 
+	constexpr int light_size = 4;
+	glm::vec3 light_position[light_size] = {
+        glm::vec3(-10.0f,  10.0f, 10.0f),
+        glm::vec3( 10.0f,  10.0f, 10.0f),
+        glm::vec3(-10.0f, -10.0f, 10.0f),
+        glm::vec3( 10.0f, -10.0f, 10.0f),
+	};
+	glm::vec3 light_colors[light_size] = {
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+	};
 
-	bool show_demo_window = true;
-	bool show_another_window = false;
-	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glm::vec3 albedo = glm::vec3(0.3f);
+	float metallic = 0.0f;
+	float roughness = 0.0f;
+
+	int nrRows = 7;
+	int nrColumns = 7;
+	float spacing = 2.5;
 	while (!glfwWindowShouldClose(window)) {
 		poll_event();
-
 		glClearColor(0, 0, 0, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-	
-		blinn_shader.use();
-		blinn_shader.set_uniform("model", glm::mat4(1));
-		blinn_shader.set_uniform("view", camera_ptr->get_view());
-		blinn_shader.set_uniform("projection", camera_ptr->get_projection());
-		blinn_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
-		blinn_shader.set_uniform("light_dir", glm::normalize(glm::vec3(0.5, 0.5, 0)));
-		glBindTexture(GL_TEXTURE_2D, cube_diffuse_map);
-		blinn_shader.set_uniform("diffuse_map1", 0);
-		cube_ptr->draw(blinn_shader);
 
-		{
-			ImGui::Begin("hello world");
-			//ImGui::Text("test imgui");
-			//ImGui::Text("Application: average %3.f ms/frame (%1.f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-			ImGui::End();
-			ImGui::Render();
+		pbr_shader.use();
+		pbr_shader.set_uniform("look_from", camera_ptr->get_look_from());
+		pbr_shader.set_uniform("view", camera_ptr->get_view());
+		pbr_shader.set_uniform("projection", camera_ptr->get_projection());
+		pbr_shader.set_uniform("albedo", albedo);
+		pbr_shader.set_uniform("metallic", metallic);
+		pbr_shader.set_uniform("roughness", roughness);
+		//for (int i = 0; i < light_size; ++i) {
+		//	std::string var_pos = std::format("lights[{}].position", i);
+		//	std::string var_col = std::format("lights[{}].color", i);
+		//	//std::string var_pos = std::format("lightPositions[{}]", i);
+		//	//std::string var_col = std::format("lightColors[{}]", i);
+		//	pbr_shader.set_uniform(var_pos.c_str(), light_position[i]);
+		//	pbr_shader.set_uniform(var_col.c_str(), light_colors[i]);
+		//}
+
+		glm::mat4 model = glm::mat4(1.0f);
+		for (int row = 0; row < nrRows; ++row) {
+			pbr_shader.set_uniform("metallic", (float)row / (float)nrRows);
+			for (int col = 0; col < nrColumns; ++col) {
+				// we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
+				// on direct lighting.
+				pbr_shader.set_uniform("roughness", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
+
+				model = glm::mat4(1.0f);
+				model = glm::translate(model, glm::vec3(
+					(col - (nrColumns / 2)) * spacing,
+					(row - (nrRows / 2)) * spacing,
+					0.0f
+				));
+				//pbr_shader.set_uniform("model", model);
+				sphere_ptr->set_model(model);
+				sphere_ptr->draw(pbr_shader);
+			}
 		}
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		glfwSwapBuffers(window);
+
+		// render light source (simply re-render sphere at light positions)
+// this looks a bit off as we use the same shader, but it'll make their positions obvious and 
+// keeps the codeprint small.
+		for (unsigned int i = 0; i < sizeof(light_position) / sizeof(light_position[0]); ++i) {
+			glm::vec3 newPos = light_position[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
+			newPos = light_position[i];
+			pbr_shader.set_uniform(std::format("lights[{}].position", i).c_str(), newPos);
+			pbr_shader.set_uniform(std::format("lights[{}].color", i).c_str(), light_colors[i] );
+
+			model = glm::mat4(1.0f);
+			model = glm::translate(model, newPos);
+			model = glm::scale(model, glm::vec3(0.5f));
+			sphere_ptr->set_model(model);
+			sphere_ptr->draw(pbr_shader);
+		}
+
+		ImGui::Begin("PBR");
+		{
+			ImGui::ColorEdit3("albedo", glm::value_ptr(albedo));
+			ImGui::SliderFloat("metallic", &metallic, 0.f, 1.0f);
+			ImGui::SliderFloat("roughness", &roughness, 0.f, 1.f);
+			ImGui::NewLine();
+			for (int i = 0; i < light_size; ++i) {
+				std::string var = std::format("light_position{}", i + 1);
+				ImGui::InputFloat3(var.c_str(), glm::value_ptr(light_position[i]));
+			}
+			ImGui::NewLine();
+			for (int i = 0; i < light_size; ++i) {
+				std::string var = std::format("light_color{}", i + 1);
+				ImGui::InputFloat3(var.c_str(), glm::value_ptr(light_colors[i]));
+			}
+		}
+		ImGui::End();
+		swap_buffer();
 	}
 }
-

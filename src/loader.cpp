@@ -87,18 +87,63 @@ std::shared_ptr<Model> Loader::create_quad() {
 	std::generate_n(std::back_inserter(indices), vertices.size(), [n = 0]() mutable {
 		return n++;
 	});
+
+	static int counter = 0;
 	generate_normal(vertices, indices);
 	generate_tangent(vertices, indices);
 	Mesh mesh(std::move(vertices), std::move(indices), {});
 	std::shared_ptr<Model> model_ptr = std::make_unique<Model>();
 	model_ptr->meshs.push_back(std::move(mesh));
 	model_ptr->directory = "create_quad";
+	model_ptr->model_name_ = std::format("quad{}", ++counter);
 	return model_ptr;
 }
 
 
 std::shared_ptr<Model> Loader::create_sphere() {
-	return nullptr;
+	std::vector<Vertex> vertices;
+	constexpr uint X_SEGMENTS = 64;
+	constexpr uint Y_SEGMENTS = 64;
+	constexpr float PI = 3.141592653f;
+	for (uint y = 0; y <= Y_SEGMENTS; ++y) {
+		for (uint x = 0; x <= X_SEGMENTS; ++x) {
+			float x_segment = float(x) / float(X_SEGMENTS);
+			float y_segment = float(y) / float(Y_SEGMENTS);
+			float xpos = std::cos(x_segment * 2.0f * PI) * std::sin(y_segment * PI);
+			float ypos = std::cos(y_segment * PI);
+			float zpos = std::sin(x_segment * 2.0f * PI) * std::sin(y_segment * PI);
+			glm::vec3 normal = glm::normalize(glm::vec3(xpos, ypos, zpos));
+			vertices.push_back({ glm::vec3(xpos, ypos, zpos), glm::vec2(x_segment, y_segment), normal });
+		}
+	}
+
+	std::vector<uint> indices;
+	bool odd_row = false;
+	for (uint y = 0; y < Y_SEGMENTS; ++y) {
+		if (!odd_row) {
+			for (int x = 0; x <= X_SEGMENTS; ++x) {
+				indices.push_back(y     * (X_SEGMENTS + 1) + x);
+				indices.push_back((y+1) * (X_SEGMENTS + 1) + x);
+			}
+		} else {
+			for (int x = X_SEGMENTS; x >= 0; --x) {
+				indices.push_back((y+1) * (X_SEGMENTS + 1) + x);
+				indices.push_back(y     * (X_SEGMENTS + 1) + x);
+			}
+		}
+		odd_row = !odd_row;
+	}
+
+	static int counter = 0;
+	//generate_normal(vertices, indices);
+	generate_tangent(vertices, indices);
+	Mesh mesh(std::move(vertices), std::move(indices), {});
+	mesh.draw_type_ = GL_TRIANGLE_STRIP;
+	std::shared_ptr<Model> model_ptr = std::make_unique<Model>();
+	model_ptr->meshs.push_back(std::move(mesh));
+	model_ptr->directory = "create_sphere";
+	model_ptr->model_name_ = std::format("sphere{}", ++counter);
+	return model_ptr;
 }
 
 Loader::ImageCacheRecycle::~ImageCacheRecycle() {

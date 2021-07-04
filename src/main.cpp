@@ -21,10 +21,10 @@ void destroy() {
 int main(void) {
 	init();
 
-	blinn_phong();
+	//blinn_phong();
 	//normal_mapping();
 	//parallax_mapping();
 	//shadow_mapping();
 	//bloom();
-	//imgui_test();
+	pbr();
 }

@@ -22,6 +22,8 @@ class Mesh {
 	GLuint					VBO;
 	GLuint					EBO;
 public:
+	GLuint					draw_type_ = GL_TRIANGLES;
+public:
 	Mesh(std::vector<Vertex> &&_vertices, std::vector<uint> &&_indices, std::vector<Texture> &&_textures);
 	Mesh(const Mesh &) = delete;
 	Mesh(Mesh &&other) noexcept;
