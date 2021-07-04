@@ -37,6 +37,9 @@ void Camera::mouse_callback(double offset_x, double offset_y) {
 		prev_y = float(offset_y);
 		return;
 	}
+	if (!enable_mouse)
+		return;
+
 	pitch = std::clamp(pitch + (float(prev_y - offset_y) * sensitivity), -89.5f, 89.5f);
 	yaw = yaw + float(offset_x - prev_x) * sensitivity;
 	prev_x = float(offset_x);
@@ -45,8 +48,10 @@ void Camera::mouse_callback(double offset_x, double offset_y) {
 }
 
 void Camera::scroll_callback(double offset) {
+	if (!enable_mouse)
+		return;
+
 	fov = std::clamp(fov + float(-offset * sensitivity), 0.1f, 89.f);
-	std::cout << "fov\t" << fov << std::endl;
 }
 
 void Camera::framebuff_callback(int width, int height) {
@@ -54,6 +59,9 @@ void Camera::framebuff_callback(int width, int height) {
 }
 
 void Camera::key_callback(CameraKey key, float delat_time) {
+	if (!enable_keyboard)
+		return;
+
 	switch (key) {
 	case CameraKey::Forward:
 		look_from += look_at * (delat_time * speed);
@@ -68,8 +76,26 @@ void Camera::key_callback(CameraKey key, float delat_time) {
 		look_from -= world_x * (delat_time * speed);
 		break;
 	}
-	std::cout << "form\t" << glm::to_string(look_from) << std::endl;
-	std::cout << "look_at\t" << glm::to_string(look_at) << std::endl;
+	//std::cout << "form\t" << glm::to_string(look_from) << std::endl;
+	//std::cout << "look_at\t" << glm::to_string(look_at) << std::endl;
+}
+
+
+void Camera::camera_widgets() {
+	ImGui::Begin("camera");
+	{
+		ImGui::InputFloat3("look_from", glm::value_ptr(look_from));
+		ImGui::InputFloat3("look_up", glm::value_ptr(look_up));
+		ImGui::DragFloat("fov", &fov, 0.5f, 1.f, 89.f);
+		ImGui::DragFloat("pitch", &pitch, 1.f, -89.5, 89.5f);
+		ImGui::DragFloat("yaw", &yaw);
+		ImGui::InputFloat("sensitivity", &sensitivity);
+		ImGui::InputFloat("speed", &speed);
+		ImGui::Checkbox("mouse", &enable_mouse);
+		ImGui::Checkbox("keyboard", &enable_keyboard);
+	}
+	ImGui::End();
+	update_wrold_axis();
 }
 
 void Camera::update_wrold_axis() {
@@ -80,7 +106,6 @@ void Camera::update_wrold_axis() {
 	look_at = glm::normalize(offset);
 	world_x = glm::normalize(glm::cross(look_at, world_y));
 	look_up = glm::normalize(glm::cross(world_x, look_at));
-	std::cout << "look_at\t" << glm::to_string(look_at) << std::endl;
 }
 
 

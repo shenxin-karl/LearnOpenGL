@@ -6,7 +6,7 @@
 //std::unordered_map<std::string, std::shared_ptr<ImageInfo>> image_cache;
 //std::unordered_map<std::string, GLuint> texture2d_cache;
 
-std::unique_ptr<Model> Loader::load_model(const std::string &path) {
+std::shared_ptr<Model> Loader::load_model(const std::string &path) {
 	Assimp::Importer importer;
 	auto flag = aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_GenNormals | aiProcess_CalcTangentSpace;
 	const aiScene *scene = importer.ReadFile(path, flag);
@@ -15,14 +15,16 @@ std::unique_ptr<Model> Loader::load_model(const std::string &path) {
 		return nullptr;
 	}
 	
-	std::unique_ptr<Model> model_ptr = std::make_unique<Model>();
-	model_ptr->directory = path.substr(0, path.find_last_of('/'));
+	std::shared_ptr<Model> model_ptr = std::make_unique<Model>();
+	auto pos = path.find_last_of('/');
+	model_ptr->directory = path.substr(0, pos);
+	model_ptr->model_name_ = path.substr(pos + 1);
 	process_node(scene->mRootNode, scene, model_ptr);
 	return model_ptr;
 }	
 
-std::unique_ptr<Model> Loader::create_test_plane() {
-	std::unique_ptr<Model> model_ptr = std::make_unique<Model>();
+std::shared_ptr<Model> Loader::create_test_plane() {
+	std::shared_ptr<Model> model_ptr = std::make_unique<Model>();
 
 	std::vector<Vertex> vertices = {
 		Vertex{ glm::vec3(-1.0,  1.0, 0.0), glm::vec2(0.0, 1.0) },		// ×óÉÏ½Ç
@@ -36,17 +38,19 @@ std::unique_ptr<Model> Loader::create_test_plane() {
 		0, 3, 2,
 	};
 
+	static int counter = 0;
 	generate_normal(vertices, indices);
 	generate_tangent(vertices, indices);
 	Mesh mesh(std::move(vertices), std::move(indices), {});
 	model_ptr->meshs.push_back(std::move(mesh));
 	model_ptr->directory = "create_test_plane";
+	model_ptr->model_name_ = std::format("test_plane{}", ++counter);
 	return model_ptr;
 }
 
 
-std::unique_ptr<Model> Loader::create_trest_cube() {
-	std::unique_ptr<Model> model_ptr = std::make_unique<Model>();
+std::shared_ptr<Model> Loader::create_trest_cube() {
+	std::shared_ptr<Model> model_ptr = std::make_unique<Model>();
 	std::vector<Vertex> vertices = {
 		#include "test_cube/vertex.txt"
 	};
@@ -57,15 +61,17 @@ std::unique_ptr<Model> Loader::create_trest_cube() {
 		return n++;
 	});
 
+	static int counter = 0;
 	generate_normal(vertices, indices);
 	generate_tangent(vertices, indices);
 	Mesh mesh(std::move(vertices), std::move(indices), {});
 	model_ptr->meshs.push_back(std::move(mesh));
 	model_ptr->directory = "create_trest_cube";
+	model_ptr->model_name_ = std::format("cube{}", ++counter);
 	return model_ptr;
 }
 
-std::unique_ptr<Model> Loader::create_quad() {
+std::shared_ptr<Model> Loader::create_quad() {
 	std::vector<Vertex> vertices = {
 		Vertex{ glm::vec3(-1.0f,  1.0f, 0.f), glm::vec2(0.0f, 1.0f) },		// ×óÉÏ½Ç
 		Vertex{ glm::vec3(-1.0f, -1.0f, 0.f), glm::vec2(0.0f, 0.0f) },		// ×óÏÂ½Ç
@@ -84,10 +90,15 @@ std::unique_ptr<Model> Loader::create_quad() {
 	generate_normal(vertices, indices);
 	generate_tangent(vertices, indices);
 	Mesh mesh(std::move(vertices), std::move(indices), {});
-	std::unique_ptr<Model> model_ptr = std::make_unique<Model>();
+	std::shared_ptr<Model> model_ptr = std::make_unique<Model>();
 	model_ptr->meshs.push_back(std::move(mesh));
 	model_ptr->directory = "create_quad";
 	return model_ptr;
+}
+
+
+std::shared_ptr<Model> Loader::create_sphere() {
+	return nullptr;
 }
 
 Loader::ImageCacheRecycle::~ImageCacheRecycle() {
@@ -233,7 +244,7 @@ GLuint Loader::load_texture2d_impl(const std::string &path, std::array<int, 6> f
 	return texture;
 }
 
-void Loader::process_node(aiNode *node, const aiScene *scene, std::unique_ptr<Model> &model_ptr) {
+void Loader::process_node(aiNode *node, const aiScene *scene, std::shared_ptr<Model> &model_ptr) {
 	for (size_t i = 0; i < node->mNumMeshes; ++i) {
 		int index = node->mMeshes[i];
 		aiMesh *mesh = scene->mMeshes[index];
@@ -243,7 +254,7 @@ void Loader::process_node(aiNode *node, const aiScene *scene, std::unique_ptr<Mo
 		process_node(node->mChildren[i], scene, model_ptr);
 }
 
-Mesh Loader::process_mesh(aiMesh *mesh, const aiScene *scene, std::unique_ptr<Model> &model_ptr) {
+Mesh Loader::process_mesh(aiMesh *mesh, const aiScene *scene, std::shared_ptr<Model> &model_ptr) {
 	std::vector<Vertex> vertices;
 	for (size_t i = 0; i < mesh->mNumVertices; ++i) {
 		Vertex vertex;
@@ -293,7 +304,7 @@ Mesh Loader::process_mesh(aiMesh *mesh, const aiScene *scene, std::unique_ptr<Mo
 }
 
 std::vector<Texture> Loader::load_material_textures(aiMaterial *material, aiTextureType type, const std::string &var_name,
-	std::unique_ptr<Model> &model_ptr) 
+	std::shared_ptr<Model> &model_ptr) 
 {
 	std::vector<Texture> textures;
 	for (size_t i = 0; i < material->GetTextureCount(type); ++i) {

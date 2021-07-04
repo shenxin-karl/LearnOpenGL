@@ -43,9 +43,9 @@ GLFWwindow *create_window(int width, int height, const std::string &title) {
 		return nullptr;
 	}
 
-	glfwSetWindowPos(window, 500, 200);
+	glfwSetWindowPos(window, 300, 200);
 	glViewport(0, 0, width, height);
-	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);			// 隐藏鼠标的显示,适合摄像机
+	//glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);			// 隐藏鼠标的显示,适合摄像机
 	glfwSetFramebufferSizeCallback(window, Scene::framebuffer_size_callback);
 	glfwSetKeyCallback(window, Scene::key_callback);
 	glfwSetCursorPosCallback(window, Scene::mouse_callback);
@@ -53,8 +53,8 @@ GLFWwindow *create_window(int width, int height, const std::string &title) {
 	return window;
 }
 
-constexpr int g_width = 800;
-constexpr int g_height = 600;
+constexpr int g_width = 1200;
+constexpr int g_height = 800;
 constexpr float g_aspect = float(g_width) / float(g_height);
 constexpr float g_near = 0.1f;
 constexpr float g_far = 1000.f;
@@ -117,6 +117,17 @@ void bloom() {
 	camera_ptr->set_aspect(g_aspect);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
 	scene.bloom();
+	glfwDestroyWindow(window);
+}
+
+void imgui_test() {
+	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(0, 2.f, 5);
+	glm::vec3 look_up(0, 1, 0);
+	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
+	camera_ptr->set_aspect(g_aspect);
+	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
+	scene.imgui_test();
 	glfwDestroyWindow(window);
 }
 

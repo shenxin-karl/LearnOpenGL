@@ -11,6 +11,9 @@ class Scene {
 	int   next_time = 0;
 	int   fps = 0;
 	bool  keys[512] = { false };
+	bool  show_camera_widgets_ = false;
+	std::vector<std::shared_ptr<Model>> models_;
+	std::vector<unsigned char>			model_flags_;
 public:
 	std::function<void(int key, int scancode, int action, int mode)>	on_key_callback;
 	std::function<void(double xpos, double ypos)>						on_mouse_callback;
@@ -25,7 +28,10 @@ public:
 	void process_mouse_callback(double xpos, double ypos);
 	void process_scroll_callback(double xoffset, double yoffset);
 	void process_framebuffer_size_callback(int width, int height);
+	void add_model(std::shared_ptr<Model> model_ptr);
+	void scene_widgets();
 	void poll_event();
+	void swap_buffer();
 public:
 	static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mode);
 	static void mouse_callback(GLFWwindow *window, double xpos, double ypos);
@@ -38,4 +44,5 @@ public:
 	void parallax_mapping();
 	void shadow_mapping();
 	void bloom();
+	void imgui_test();
 };

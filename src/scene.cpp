@@ -1,12 +1,33 @@
 #include "common.h"
 
 Scene::Scene(GLFWwindow *_window, std::shared_ptr<Camera> _camera_ptr, int _widht, int _hegith, float _near, float _far)
-: window(_window), camera_ptr(_camera_ptr), width(_widht), height(_hegith), near(_near), far(_far) {
+: window(_window), camera_ptr(_camera_ptr), width(_widht), height(_hegith), near(_near), far(_far)
+{
 	scene_mapping.insert(std::make_pair(window, this));
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO &io = ImGui::GetIO(); (void)io;
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsClassic();
+
+	// Setup Platform/Renderer backends
+	const char *glsl_version = "#version 130";
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init(glsl_version);
 }
 
 Scene::~Scene() {
 	scene_mapping.erase(window);
+
+	// imgui Cleanup
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 }
 
 void Scene::process_key_callback(int key, int scancode, int action, int mode) {
@@ -42,6 +63,30 @@ void Scene::process_framebuffer_size_callback(int width, int height) {
 		on_frambuffer_size_callback(width, height);
 }
 
+
+void Scene::add_model(std::shared_ptr<Model> model_ptr) {
+	models_.push_back(model_ptr);
+	model_flags_.push_back(0);
+}
+
+void Scene::scene_widgets() {
+	ImGui::Begin("scene");
+	{
+		ImGui::Checkbox("camera", &show_camera_widgets_);
+		for (int i = 0; i < models_.size(); ++i)
+			ImGui::Checkbox(models_[i]->get_name().c_str(), reinterpret_cast<bool *>(&model_flags_[i]));
+	}
+	ImGui::End();
+
+	if (show_camera_widgets_)
+		camera_ptr->camera_widgets();
+
+	for (int i = 0; i < models_.size(); ++i) {
+		if (model_flags_[i])
+			models_[i]->show_widgets();
+	}
+}
+
 void Scene::poll_event() {
 	glfwPollEvents();
 
@@ -67,6 +112,18 @@ void Scene::poll_event() {
 		next_time = static_cast<int>(curr_time) + 1;
 		fps = 0;
 	}
+
+	ImGui_ImplOpenGL3_NewFrame();
+	ImGui_ImplGlfw_NewFrame();
+	ImGui::NewFrame();
+}
+
+
+void Scene::swap_buffer() {
+	scene_widgets();
+	ImGui::Render();
+	ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+	glfwSwapBuffers(window);
 }
 
 void Scene::key_callback(GLFWwindow *window, int key, int scancode, int action, int mode) {
@@ -91,19 +148,24 @@ void Scene::framebuffer_size_callback(GLFWwindow *window, int width, int height)
 }
 
 void Scene::blinn_phong() {
-	std::unique_ptr<Model> model_ptr = Loader::load_model("resources/alod/dino obj.obj");
+	std::shared_ptr<Model> model_ptr = Loader::load_model("resources/alod/dino obj.obj");
+	add_model(model_ptr);
 	GLuint diffuse_map = Loader::load_texture2d("resources/alod/dino.jpg");
-
 	Shader blinn_phong_shader("shader/blinn_phong/blinn_phong.vert", "shader/blinn_phong/blinn_phong.frag");
 	if (!blinn_phong_shader) {
 		std::cerr << "Failed initialize blinn_phong_shader" << std::endl;
 		return;
 	}
 
-	glm::vec3 light_dir = glm::normalize(glm::vec3(0.5f, 0.5f, 0.f));
 	blinn_phong_shader.use();
 	glBindTexture(GL_TEXTURE_2D, diffuse_map);
 	blinn_phong_shader.set_uniform("diffuse_map1", 0);
+
+	glm::vec3 light_dir = glm::normalize(glm::vec3(0.5f, 0.5f, 0.f));
+	glm::vec3 light_ambient = glm::vec3(0.3f);
+	glm::vec3 light_diffuse = glm::vec3(0.5f);
+	glm::vec3 light_specular = glm::vec3(0.2f);
+	float shininess = 64.f;
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
@@ -112,18 +174,33 @@ void Scene::blinn_phong() {
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		blinn_phong_shader.use();
-		blinn_phong_shader.set_uniform("model", glm::mat4(1.f));
 		blinn_phong_shader.set_uniform("view", camera_ptr->get_view());
 		blinn_phong_shader.set_uniform("projection", camera_ptr->get_projection());
 		blinn_phong_shader.set_uniform("light_dir", light_dir);
 		blinn_phong_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
+		
+		light_dir = glm::normalize(light_dir);
+		blinn_phong_shader.set_uniform("light.light_dir", light_dir);
+		blinn_phong_shader.set_uniform("light.ambient", light_ambient);
+		blinn_phong_shader.set_uniform("light.diffuse", light_diffuse);
+		blinn_phong_shader.set_uniform("light.specular", light_specular);
+		blinn_phong_shader.set_uniform("light.shininess", shininess);
 		model_ptr->draw(blinn_phong_shader);
-		glfwSwapBuffers(window);
+
+		ImGui::Begin("Light");
+		{
+			ImGui::ColorEdit3("ambient", glm::value_ptr(light_ambient));
+			ImGui::ColorEdit3("diffuse", glm::value_ptr(light_diffuse));
+			ImGui::ColorEdit3("specular", glm::value_ptr(light_specular));
+			ImGui::DragFloat("shininess", &shininess, 1.f, 1.f, 256.f);
+		}
+		ImGui::End();
+		swap_buffer();
 	}
 }
 
 void Scene::normal_mapping() {
-	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
+	std::shared_ptr<Model> plane_ptr = Loader::create_test_plane();
 	GLuint diffuse_map = Loader::load_texture2d("resources/test_plane/brickwall.jpg");
 	GLuint normal_map = Loader::load_texture2d("resources/test_plane/brickwall_normal.jpg");
 	Shader normal_mapping_shader("shader/normal_mapping/normal_mapping.vert", "shader/normal_mapping/normal_mapping.frag");
@@ -162,7 +239,7 @@ void Scene::normal_mapping() {
 }
 
 void Scene::parallax_mapping() {
-	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
+	std::shared_ptr<Model> plane_ptr = Loader::create_test_plane();
 	GLuint diffuse_map = Loader::load_texture2ds("resources/test_plane/bricks2.jpg");
 	GLuint normal_map = Loader::load_texture2d("resources/test_plane/bricks2_normal.jpg");
 	GLuint displacement_map = Loader::load_texture2d("resources/test_plane/bricks2_disp.jpg");
@@ -208,8 +285,8 @@ void Scene::parallax_mapping() {
 }
 
 void Scene::shadow_mapping() {
-	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
-	std::unique_ptr<Model> cube_ptr = Loader::create_trest_cube();
+	std::shared_ptr<Model> plane_ptr = Loader::create_test_plane();
+	std::shared_ptr<Model> cube_ptr = Loader::create_trest_cube();
 	GLuint plane_diffuse_map = Loader::load_texture2ds("resources/test_plane/wood.png");
 	GLuint cube_diffuse_map = Loader::load_texture2ds("resources/test_cube/container2.png");
 
@@ -330,9 +407,9 @@ void Scene::shadow_mapping() {
 }
 
 void Scene::bloom() {
-	std::unique_ptr<Model> plane_ptr = Loader::create_test_plane();
-	std::unique_ptr<Model> cube_ptr = Loader::create_trest_cube();
-	std::unique_ptr<Model> quad_ptr = Loader::create_quad();
+	std::shared_ptr<Model> plane_ptr = Loader::create_test_plane();
+	std::shared_ptr<Model> cube_ptr = Loader::create_trest_cube();
+	std::shared_ptr<Model> quad_ptr = Loader::create_quad();
 	GLuint plane_diffuse_map = Loader::load_texture2ds("resources/test_plane/wood.png");
 	GLuint cube_diffuse_map = Loader::load_texture2ds("resources/test_cube/container2.png");
 	
@@ -532,5 +609,48 @@ void Scene::bloom() {
 	glDeleteFramebuffers(2, pingpong_fbo);
 	glDeleteTextures(2, pingpong_buffer);
 	glDeleteRenderbuffers(2, pingpong_rbo);
+}
+
+void Scene::imgui_test() {
+	std::shared_ptr<Model> cube_ptr = Loader::create_trest_cube();
+	add_model(cube_ptr);
+	GLuint cube_diffuse_map = Loader::load_texture2d("resources/test_cube/container2.png");
+	Shader blinn_shader("shader/blinn_phong/blinn_phong.vert", "shader/blinn_phong/blinn_phong.frag");
+	if (!blinn_shader) {
+		std::cerr << "Failed initialize blinn_shader" << std::endl;
+		return;
+	}
+
+
+	bool show_demo_window = true;
+	bool show_another_window = false;
+	ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+	glEnable(GL_DEPTH_TEST);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+
+		glClearColor(0, 0, 0, 1);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+	
+		blinn_shader.use();
+		blinn_shader.set_uniform("model", glm::mat4(1));
+		blinn_shader.set_uniform("view", camera_ptr->get_view());
+		blinn_shader.set_uniform("projection", camera_ptr->get_projection());
+		blinn_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
+		blinn_shader.set_uniform("light_dir", glm::normalize(glm::vec3(0.5, 0.5, 0)));
+		glBindTexture(GL_TEXTURE_2D, cube_diffuse_map);
+		blinn_shader.set_uniform("diffuse_map1", 0);
+		cube_ptr->draw(blinn_shader);
+
+		{
+			ImGui::Begin("hello world");
+			//ImGui::Text("test imgui");
+			//ImGui::Text("Application: average %3.f ms/frame (%1.f FPS)", 1000.f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+			ImGui::End();
+			ImGui::Render();
+		}
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		glfwSwapBuffers(window);
+	}
 }
 

@@ -23,6 +23,8 @@ class Camera {
 	float		speed;
 	float prev_x = 0.f;
 	float prev_y = 0.f;
+	bool		enable_mouse = false;
+	bool		enable_keyboard = true;
 public:
 	Camera(const glm::vec3 &lf, const glm::vec3 &lu, float _fov, float _near, float _far, 
 		   float _sensitivity, float _speed);
@@ -36,6 +38,7 @@ public:
 	void scroll_callback(double offset);
 	void framebuff_callback(int width, int height);
 	void key_callback(CameraKey key, float speed);
+	void camera_widgets();
 private:
 	void update_wrold_axis();
 };
