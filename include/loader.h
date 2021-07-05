@@ -15,7 +15,7 @@ public:
 	static std::shared_ptr<Model> create_test_plane();
 	static std::shared_ptr<Model> create_trest_cube();
 	static std::shared_ptr<Model> create_quad();
-	static std::shared_ptr<Model> create_sphere();
+	static std::shared_ptr<Model> create_sphere();		// 渲染球时不能开启背面裁剪
 	static const std::shared_ptr<ImageInfo> load_image(const std::string &path);
 	static void generate_normal(std::vector<Vertex> &vertice, const std::vector<uint> &indices);
 	static void generate_tangent(std::vector<Vertex> &vertice, const std::vector<uint> &indices);

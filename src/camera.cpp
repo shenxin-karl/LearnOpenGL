@@ -31,6 +31,12 @@ constexpr float Camera::radian(float angle) {
 	return angle / 180.f * 3.1415926f;
 }
 
+void Camera::init_euler_angle(float _pitch, float _yaw) {
+	pitch = _pitch;
+	yaw = _yaw;
+	update_wrold_axis();
+}
+
 void Camera::mouse_callback(double offset_x, double offset_y) {
 	if (prev_x == 0 && prev_y == 0) {
 		prev_x = float(offset_x);

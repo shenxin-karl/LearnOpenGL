@@ -33,6 +33,7 @@ public:
 	const glm::vec3 &get_look_from() const;
 	void set_aspect(float _aspect) noexcept;
 	constexpr static float radian(float angle);
+	void init_euler_angle(float _pitch, float _yaw);
 public:
 	void mouse_callback(double offset_x, double offset_y);
 	void scroll_callback(double offset);

@@ -635,7 +635,6 @@ void Scene::pbr() {
 	};
 
 	glEnable(GL_DEPTH_TEST);
-	glEnable(GL_CULL_FACE);
 	glm::vec3 albedo = glm::vec3(0.3f);
 	float metallic = 0.0f;
 	float roughness = 0.0f;
@@ -649,28 +648,23 @@ void Scene::pbr() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		pbr_shader.use();
-		pbr_shader.set_uniform("look_from", camera_ptr->get_look_from());
+		pbr_shader.set_uniform("view_pos", camera_ptr->get_look_from());
 		pbr_shader.set_uniform("view", camera_ptr->get_view());
 		pbr_shader.set_uniform("projection", camera_ptr->get_projection());
 		pbr_shader.set_uniform("albedo", albedo);
 		pbr_shader.set_uniform("metallic", metallic);
 		pbr_shader.set_uniform("roughness", roughness);
-		//for (int i = 0; i < light_size; ++i) {
-		//	std::string var_pos = std::format("lights[{}].position", i);
-		//	std::string var_col = std::format("lights[{}].color", i);
-		//	//std::string var_pos = std::format("lightPositions[{}]", i);
-		//	//std::string var_col = std::format("lightColors[{}]", i);
-		//	pbr_shader.set_uniform(var_pos.c_str(), light_position[i]);
-		//	pbr_shader.set_uniform(var_col.c_str(), light_colors[i]);
-		//}
-
+		for (int i = 0; i < light_size; ++i) {
+			std::string var_pos = std::format("lights[{}].position", i);
+			std::string var_col = std::format("lights[{}].color", i);
+			pbr_shader.set_uniform(var_pos.c_str(), light_position[i]);
+			pbr_shader.set_uniform(var_col.c_str(), light_colors[i]);
+		}
 		glm::mat4 model = glm::mat4(1.0f);
 		for (int row = 0; row < nrRows; ++row) {
-			pbr_shader.set_uniform("metallic", (float)row / (float)nrRows);
+			pbr_shader.set_uniform("metallic", float(row) / float(nrRows));
 			for (int col = 0; col < nrColumns; ++col) {
-				// we clamp the roughness to 0.05 - 1.0 as perfectly smooth surfaces (roughness of 0.0) tend to look a bit off
-				// on direct lighting.
-				pbr_shader.set_uniform("roughness", glm::clamp((float)col / (float)nrColumns, 0.05f, 1.0f));
+				pbr_shader.set_uniform("roughness", glm::clamp(float(col) / float(nrColumns), 0.05f, 1.0f));
 
 				model = glm::mat4(1.0f);
 				model = glm::translate(model, glm::vec3(
@@ -678,26 +672,9 @@ void Scene::pbr() {
 					(row - (nrRows / 2)) * spacing,
 					0.0f
 				));
-				//pbr_shader.set_uniform("model", model);
-				sphere_ptr->set_model(model);
+				pbr_shader.set_uniform("model", model);
 				sphere_ptr->draw(pbr_shader);
 			}
-		}
-
-		// render light source (simply re-render sphere at light positions)
-// this looks a bit off as we use the same shader, but it'll make their positions obvious and 
-// keeps the codeprint small.
-		for (unsigned int i = 0; i < sizeof(light_position) / sizeof(light_position[0]); ++i) {
-			glm::vec3 newPos = light_position[i] + glm::vec3(sin(glfwGetTime() * 5.0) * 5.0, 0.0, 0.0);
-			newPos = light_position[i];
-			pbr_shader.set_uniform(std::format("lights[{}].position", i).c_str(), newPos);
-			pbr_shader.set_uniform(std::format("lights[{}].color", i).c_str(), light_colors[i] );
-
-			model = glm::mat4(1.0f);
-			model = glm::translate(model, newPos);
-			model = glm::scale(model, glm::vec3(0.5f));
-			sphere_ptr->set_model(model);
-			sphere_ptr->draw(pbr_shader);
 		}
 
 		ImGui::Begin("PBR");
