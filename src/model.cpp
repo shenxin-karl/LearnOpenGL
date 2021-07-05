@@ -4,7 +4,7 @@ Model::Model() : model_(1) {
 }
 
 void Model::draw(Shader &shader) const {
-	//shader.set_uniform("model", model_);
+	shader.set_uniform("model", model_);
 	for (auto &mesh : meshs)
 		mesh.draw(shader);
 }

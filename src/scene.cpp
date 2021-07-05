@@ -660,6 +660,9 @@ void Scene::pbr() {
 			pbr_shader.set_uniform(var_pos.c_str(), light_position[i]);
 			pbr_shader.set_uniform(var_col.c_str(), light_colors[i]);
 		}
+#if 1
+		sphere_ptr->draw(pbr_shader);
+#else
 		glm::mat4 model = glm::mat4(1.0f);
 		for (int row = 0; row < nrRows; ++row) {
 			pbr_shader.set_uniform("metallic", float(row) / float(nrRows));
@@ -672,11 +675,11 @@ void Scene::pbr() {
 					(row - (nrRows / 2)) * spacing,
 					0.0f
 				));
-				pbr_shader.set_uniform("model", model);
+				sphere_ptr->set_model(model);
 				sphere_ptr->draw(pbr_shader);
 			}
 		}
-
+#endif
 		ImGui::Begin("PBR");
 		{
 			ImGui::ColorEdit3("albedo", glm::value_ptr(albedo));
