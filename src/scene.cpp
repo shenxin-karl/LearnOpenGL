@@ -700,3 +700,32 @@ void Scene::pbr() {
 		swap_buffer();
 	}
 }
+
+void Scene::to_cube_map_test() {
+	auto cube_ptr = Loader::create_skybox();
+	Shader skybox_shader("shader/skybox/skybox.vert", "shader/skybox/skybox.frag");
+	if (!skybox_shader) {
+		std::cerr << "Failed initialize skybox_shader" << std::endl;
+		return;
+	}
+	
+	GLuint env_map = Loader::equirectangular_to_cube_map("resources/skybox/Barce_Rooftop_C_3k.hdr");
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClearColor(0, 0, 0, 1);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		skybox_shader.use();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, env_map);
+		skybox_shader.set_uniform("env_cube_map", 0);
+		skybox_shader.set_uniform("view", camera_ptr->get_view());
+		skybox_shader.set_uniform("projection", camera_ptr->get_projection());
+		cube_ptr->draw(skybox_shader);
+
+		swap_buffer();
+	}
+	return;
+}

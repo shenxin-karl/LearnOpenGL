@@ -4,7 +4,7 @@
 
 //ImageCacheRecycle Loader::image_cache_recycle;
 //std::unordered_map<std::string, std::shared_ptr<ImageInfo>> image_cache;
-//std::unordered_map<std::string, GLuint> texture2d_cache;
+//std::unordered_map<std::string, GLuint> texture_cache;
 
 std::shared_ptr<Model> Loader::load_model(const std::string &path) {
 	Assimp::Importer importer;
@@ -146,19 +146,26 @@ std::shared_ptr<Model> Loader::create_sphere() {
 	return model_ptr;
 }
 
-Loader::ImageCacheRecycle::~ImageCacheRecycle() {
-	return;
-	for (auto &&[_, ptr] : image_cache) {
-		if (ptr != nullptr && ptr->data != nullptr) {
-			stbi_image_free(ptr->data);
-			ptr->data = nullptr;
-		}
-	}
-	image_cache.clear();
+std::shared_ptr<Model> Loader::create_skybox() {
+	std::vector<Vertex> vertices = {
+		#include "skybox/vertex.txt"
+	};
 
-	for (auto &&[_, texture] : texture2d_cache)
-		glDeleteTextures(1, &texture);
-	texture2d_cache.clear();
+	std::vector<uint> indices;
+	indices.reserve(vertices.size());
+	std::generate_n(std::back_inserter(indices), vertices.size(), [n = 0]() mutable {
+		return n++;
+	});
+
+	static int counter = 0;
+	generate_normal(vertices, indices);
+	generate_tangent(vertices, indices);
+	Mesh mesh(std::move(vertices), std::move(indices), {});
+	std::shared_ptr<Model> model_ptr = std::make_unique<Model>();
+	model_ptr->meshs.push_back(std::move(mesh));
+	model_ptr->directory = "create_skybox";
+	model_ptr->model_name_ = std::format("skybox{}", ++counter);
+	return model_ptr;
 }
 
 const std::shared_ptr<ImageInfo> Loader::load_image(const std::string &path) {
@@ -171,6 +178,21 @@ const std::shared_ptr<ImageInfo> Loader::load_image(const std::string &path) {
 		return nullptr;
 
 	image_cache.insert(std::make_pair(path, res));
+	return res;
+}
+
+const std::shared_ptr<HdrImageInfo> Loader::load_hdr_image(const std::string &path) {
+	if (auto iter = hdr_image_cache.find(path); iter != hdr_image_cache.end())
+		return iter->second;
+
+	stbi_set_flip_vertically_on_load(true);
+	std::shared_ptr<HdrImageInfo> res = std::make_shared<HdrImageInfo>();
+	res->data = stbi_loadf(path.c_str(), &res->width, &res->height, &res->channel, 0);
+	stbi_set_flip_vertically_on_load(false);
+	if (res->data == nullptr)
+		return nullptr;
+
+	hdr_image_cache.insert(std::make_pair(path, res));
 	return res;
 }
 
@@ -250,8 +272,115 @@ GLuint Loader::load_texture2ds(const std::string &path) {
 	return load_texture2d_impl(path, flag);
 }
 
+GLuint Loader::equirectangular_to_cube_map(const std::string &path, int width, int height) {
+	std::shared_ptr<HdrImageInfo> image_ptr = load_hdr_image(path);
+	auto hdr_channel_type = image_ptr->channel == 3 ? GL_RGB : GL_RGBA;
+	if (image_ptr == nullptr) {
+		std::cerr << std::format("equirectangular_to_cube_map::load_hdr_image error: load {} error", path);
+		return 0;
+	}
+	
+	Shader to_cube_shader("shader/to_cube_map/to_cube_map.vert", "shader/to_cube_map/to_cube_map.frag");
+	if (!to_cube_shader) {
+		std::cerr << "Failed initialize to_cube_shader" << std::endl;
+		return 0;
+	}
+
+	GLuint equirectangular_map;
+	glGenTextures(1, &equirectangular_map);
+	glBindTexture(GL_TEXTURE_2D, equirectangular_map);
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, image_ptr->width, image_ptr->height, 0, hdr_channel_type, GL_FLOAT, image_ptr->data);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	glm::vec3 look_from(0, 0, 0);
+	glm::mat4 projection = glm::perspective(glm::radians(90.f), 1.f, 0.1f, 10.f);
+	glm::mat4 capture_view[] = {
+		glm::lookAt(look_from, glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+	};
+
+	GLuint env_cub_map;
+	glGenTextures(1, &env_cub_map);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, env_cub_map);
+	{
+		for (int i = 0; i < 6; ++i)
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	CheckError();
+	GLuint capture_fbo;
+	GLuint capture_rbo;
+	glGenFramebuffers(1, &capture_fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+	{
+		glGenRenderbuffers(1, &capture_rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, capture_rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, capture_rbo);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	to_cube_shader.use();
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, equirectangular_map);
+	to_cube_shader.set_uniform("texture_map", 0);
+	to_cube_shader.set_uniform("projection", projection);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, capture_fbo);
+	auto cube_ptr = Loader::create_trest_cube();
+	for (int i = 0; i < 6; ++i) {
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, env_cub_map, 0);
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		to_cube_shader.set_uniform("view", capture_view[i]);
+		cube_ptr->draw(to_cube_shader);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glDeleteTextures(1, &equirectangular_map);
+	glDeleteFramebuffers(1, &capture_fbo);
+	glDeleteRenderbuffers(1, &capture_rbo);
+	texture_cache.insert(std::make_pair(path, env_cub_map));
+	return env_cub_map;
+}
+
+void Loader::destroy() {
+	for (auto &&[_, ptr] : image_cache) {
+		if (ptr != nullptr && ptr->data != nullptr)
+			stbi_image_free(ptr->data);
+	}
+	image_cache.clear();
+
+	for (auto &&[_, texture] : texture_cache)
+		glDeleteTextures(1, &texture);
+	texture_cache.clear();
+
+	for (auto &&[_, ptr] : hdr_image_cache) {
+		if (ptr != nullptr && ptr->data != nullptr)
+			stbi_image_free(ptr->data);
+	}
+	hdr_image_cache.clear();
+}
+
 GLuint Loader::load_texture2d_impl(const std::string &path, std::array<int, 6> flag) {
-	if (auto iter = texture2d_cache.find(path); iter != texture2d_cache.end())
+	if (auto iter = texture_cache.find(path); iter != texture_cache.end())
 		return iter->second;
 
 	std::shared_ptr<ImageInfo> image_ptr = load_image(path);
@@ -285,7 +414,7 @@ GLuint Loader::load_texture2d_impl(const std::string &path, std::array<int, 6> f
 	}
 	glBindTexture(GL_TEXTURE_2D, 0);
 	
-	texture2d_cache.insert(std::make_pair(path, texture));
+	texture_cache.insert(std::make_pair(path, texture));
 	return texture;
 }
 

@@ -15,7 +15,8 @@ void init() {
 }
 
 void destroy() {
-
+	Loader::destroy();
+	glfwTerminate();
 }
 
 int main(void) {
@@ -26,5 +27,7 @@ int main(void) {
 	//parallax_mapping();
 	//shadow_mapping();
 	//bloom();
-	pbr();
+	//pbr();
+	to_cube_map_test();
+	destroy();
 }

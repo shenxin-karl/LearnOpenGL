@@ -12,3 +12,4 @@ void parallax_mapping();
 void shadow_mapping();
 void bloom();
 void pbr();
+void to_cube_map_test();
