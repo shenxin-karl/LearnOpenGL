@@ -53,8 +53,8 @@ GLFWwindow *create_window(int width, int height, const std::string &title) {
 	return window;
 }
 
-constexpr int g_width = 500;
-constexpr int g_height = 500;
+constexpr int g_width = 600;
+constexpr int g_height = 600;
 constexpr float g_aspect = float(g_width) / float(g_height);
 constexpr float g_near = 0.1f;
 constexpr float g_far = 1000.f;

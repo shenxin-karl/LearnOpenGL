@@ -16,14 +16,20 @@ uniform vec3  view_pos;
 uniform vec3  albedo;
 uniform float metallic;
 uniform float roughness;
+uniform samplerCube irradiance_env_map;		// 漫反射辐照度环境贴图
 
 out vec4 frag_color;
 
 const float PI = 3.1415926535898;
 
 vec3 fresnel_schlick(vec3 H, vec3 V, vec3 F0) {
-	float HdotV = dot(H, V);
-	return F0 + (1.0 - F0) * pow(max(1.0 - HdotV, 0.0), 5.0);
+	float HdotV = max(dot(H, V), 1.0);
+	return F0 + (1.0 - F0) * pow(HdotV, 5.0);
+}
+
+vec3 fresnel_schlick_roughness(vec3 N, vec3 V, vec3 F0, float roughness) {
+	float NdotV = max(dot(N, V), 0.0);
+	return F0 + (max(vec3(1.0 - roughness), 0.0) - F0) * pow(1 - NdotV, 5.0);
 }
 
 float distribution_ggx(vec3 N, vec3 H, float roughness) {
@@ -85,7 +91,13 @@ void main() {
 		Lo += (Kd * albedo / PI + specular) * radiances * NdotL;
 	}
 
-	vec3 ambient = vec3(0.03) * albedo;
+	// 使用 IBM 预处理的漫反射
+	vec3 Ks		    = fresnel_schlick_roughness(N, V, F0, roughness);
+	vec3 Kd			= 1.0 - Ks;
+	vec3 irradiance = texture(irradiance_env_map, N).rgb;
+	vec3 diffuse    = irradiance * albedo;
+	vec3 ambient	= Kd * diffuse;
+
 	vec3 color   = Lo + ambient;
 	color		 = color / (color + vec3(1));		// HDR
 	color		 = pow(color, vec3(1 / 2.2));		// gamma

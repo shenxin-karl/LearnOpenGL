@@ -24,10 +24,10 @@ int main(void) {
 
 	//blinn_phong();
 	//normal_mapping();
-	//parallax_mapping();
+	parallax_mapping();
 	//shadow_mapping();
 	//bloom();
 	//pbr();
-	to_cube_map_test();
+	//to_cube_map_test();
 	destroy();
 }

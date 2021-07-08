@@ -280,7 +280,8 @@ void Scene::parallax_mapping() {
 		parallax_mapping_shader.set_uniform("light_dir", new_light_dir);
 		plane_ptr->draw(parallax_mapping_shader);
 		CheckError();
-		glfwSwapBuffers(window);
+		//glfwSwapBuffers(window);
+		swap_buffer();
 	}
 }
 
@@ -612,13 +613,23 @@ void Scene::bloom() {
 }
 
 void Scene::pbr() {
+	GLuint hdr_cube_map = Loader::equirectangular_to_cube_map("resources/skybox/Barce_Rooftop_C_3k.hdr");
+	GLuint irradiance_env_map = Loader::irradiance_convolution(hdr_cube_map);
 	auto sphere_ptr = Loader::create_sphere();
+	auto skybox_cube_ptr = Loader::create_skybox();
+	add_model(sphere_ptr);
+
 	Shader pbr_shader("shader/pbr/pbr.vert", "shader/pbr/pbr.frag");
 	if (!pbr_shader) {
-		std::cerr << "Failed initialize sample_depth_shader" << std::endl;
+		std::cerr << "Failed initialize pbr_shader" << std::endl;
 		return;
 	}
-	add_model(sphere_ptr);
+
+	Shader skybox_shader("shader/skybox/skybox.vert", "shader/skybox/skybox.frag");
+	if (!skybox_shader) {
+		std::cerr << "Failed initialize skybox_shader" << std::endl;
+		return;
+	}
 
 	constexpr int light_size = 4;
 	glm::vec3 light_position[light_size] = {
@@ -634,7 +645,7 @@ void Scene::pbr() {
 		glm::vec3(300.0f, 300.0f, 300.0f),
 	};
 
-	glEnable(GL_DEPTH_TEST);
+
 	glm::vec3 albedo = glm::vec3(0.3f);
 	float metallic = 0.0f;
 	float roughness = 0.0f;
@@ -642,8 +653,11 @@ void Scene::pbr() {
 	int nrRows = 7;
 	int nrColumns = 7;
 	float spacing = 2.5;
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
 	while (!glfwWindowShouldClose(window)) {
 		poll_event();
+		glViewport(0, 0, width, height);
 		glClearColor(0, 0, 0, 1);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -654,13 +668,16 @@ void Scene::pbr() {
 		pbr_shader.set_uniform("albedo", albedo);
 		pbr_shader.set_uniform("metallic", metallic);
 		pbr_shader.set_uniform("roughness", roughness);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_env_map);
+		pbr_shader.set_uniform("irradiance_env_map", 0);
 		for (int i = 0; i < light_size; ++i) {
 			std::string var_pos = std::format("lights[{}].position", i);
 			std::string var_col = std::format("lights[{}].color", i);
 			pbr_shader.set_uniform(var_pos.c_str(), light_position[i]);
 			pbr_shader.set_uniform(var_col.c_str(), light_colors[i]);
 		}
-#if 1
+#if 0
 		sphere_ptr->draw(pbr_shader);
 #else
 		glm::mat4 model = glm::mat4(1.0f);
@@ -680,6 +697,14 @@ void Scene::pbr() {
 			}
 		}
 #endif
+		skybox_shader.use();
+		skybox_shader.set_uniform("view", camera_ptr->get_view());
+		skybox_shader.set_uniform("projection", camera_ptr->get_projection());
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, hdr_cube_map);
+		skybox_shader.set_uniform("env_cube_map", 0);
+		skybox_cube_ptr->draw(skybox_shader);
+
 		ImGui::Begin("PBR");
 		{
 			ImGui::ColorEdit3("albedo", glm::value_ptr(albedo));

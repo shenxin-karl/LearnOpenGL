@@ -27,7 +27,7 @@ vec2 step_parallax_mapping(sampler2D depth_map, vec2 texcoord, vec3 view_dir) {
 	vec2 p = view_dir.xy / view_dir.z * (depth * displacement_scale);
 	const float min_layers = 8;
 	const float max_layers = 32;
-	float layers = mix(min_layers, max_layers, abs(view_dir.z));
+	float layers = mix(max_layers, min_layers, abs(view_dir.z));
 	float delta_depth = 1.f / layers;
 	vec2 delta_p = p / layers;
 	float curr_depth = 1.0;
@@ -109,8 +109,8 @@ vec2 parallax_occlusion_mapping(sampler2D depth_map, vec2 texcoord, vec3 view_di
 
 void main() {
 	vec3 view_dir = normalize(fs_in.tangent_view_pos - fs_in.tangent_position);
-	vec2 texcoord = parallax_occlusion_mapping(displacement_map1, fs_in.texcoord, view_dir);
-	if (texcoord.s < 0 || texcoord.s > 1 || texcoord.t < 0 || texcoord.t > 1)
+	vec2 texcoord = step_parallax_mapping(displacement_map1, fs_in.texcoord, view_dir);
+	if (texcoord.s < 0.0 || texcoord.s > 1.0 || texcoord.t < 0.0 || texcoord.t > 1.0)
 		discard;
 
 	vec3 normal = normalize(texture(normal_map1, texcoord).rgb * 2 - 1);

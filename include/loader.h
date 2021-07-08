@@ -29,6 +29,7 @@ public:
 	static GLuint load_texture2d(const std::string &path);
 	static GLuint load_texture2ds(const std::string &path);
 	static GLuint equirectangular_to_cube_map(const std::string &path, int width = 512, int height = 512);
+	static GLuint irradiance_convolution(GLuint env_map, int width = 32, int height = 32);
 	static void destroy();
 private:
 	static GLuint load_texture2d_impl(const std::string &path, std::array<int, 6> flag);

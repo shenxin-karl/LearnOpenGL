@@ -361,6 +361,81 @@ GLuint Loader::equirectangular_to_cube_map(const std::string &path, int width, i
 	return env_cub_map;
 }
 
+GLuint Loader::irradiance_convolution(GLuint env_map, int width, int heght) {
+	auto cube_ptr = Loader::create_trest_cube();
+	Shader convolution_shader("shader/irradiance/irradiance_convolution.vert", "shader/irradiance/irradiance_convolution.frag");
+	if (!convolution_shader) {
+		std::cerr << "Failed irradiance_convolution shader" << std::endl;
+		return 0;
+	}
+
+	GLuint res;
+	glGenTextures(1, &res);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, res);
+	{
+		for (int i = 0; i < 6; ++i) {
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, width, heght, 
+				0, GL_RGB, GL_FLOAT, nullptr);
+		}
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	}
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	GLuint fbo;
+	GLuint rbo;
+	glGenFramebuffers(1, &fbo);
+	glGenRenderbuffers(1, &rbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	{
+		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, heght);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+
+	CheckError();
+	glm::vec3 look_from(0, 0, 0);
+	glm::mat4 projection = glm::perspective(glm::radians(90.f), 1.f, 0.1f, 10.f);
+	glm::mat4 capture_view[] = {
+		glm::lookAt(look_from, glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+	};
+
+	convolution_shader.use();
+	convolution_shader.set_uniform("projection", projection);
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, env_map);
+	convolution_shader.set_uniform("env_map", 0);
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	{
+		for (int i = 0; i < 6; ++i) {
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+				GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, res, 0);
+			glViewport(0, 0, width, heght);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			convolution_shader.set_uniform("view", capture_view[i]);
+			cube_ptr->draw(convolution_shader);
+		}
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	static int counter = 0;
+	glDeleteFramebuffers(1, &fbo);
+	glDeleteRenderbuffers(1, &rbo);
+	std::string key = std::format("irradiance_convolution{}", ++counter);
+	texture_cache.insert(std::make_pair(key, res));
+	return res;
+}
+
 void Loader::destroy() {
 	for (auto &&[_, ptr] : image_cache) {
 		if (ptr != nullptr && ptr->data != nullptr)
@@ -441,16 +516,18 @@ Mesh Loader::process_mesh(aiMesh *mesh, const aiScene *scene, std::shared_ptr<Mo
 		if (mesh->mTextureCoords[0]) {
 			vertex.texcoord.s = mesh->mTextureCoords[0][i].x;
 			vertex.texcoord.t = mesh->mTextureCoords[0][i].y;
+			vertex.tangent.x = mesh->mTangents[i].x;
+			vertex.tangent.y = mesh->mTangents[i].y;
+			vertex.tangent.z = mesh->mTangents[i].z;
+			vertex.bitangent.x = mesh->mBitangents[i].x;
+			vertex.bitangent.y = mesh->mBitangents[i].y;
+			vertex.bitangent.z = mesh->mBitangents[i].z;
 		} else {
-			vertex.texcoord.s = 0.f;
-			vertex.texcoord.t = 0.f;
+			vertex.texcoord = glm::vec2(0);
+			vertex.tangent = glm::vec3(0);
+			vertex.bitangent = glm::vec3(0);
 		}
-		vertex.tangent.x = mesh->mTangents[i].x;
-		vertex.tangent.y = mesh->mTangents[i].y;
-		vertex.tangent.z = mesh->mTangents[i].z;
-		vertex.bitangent.x = mesh->mBitangents[i].x;
-		vertex.bitangent.y = mesh->mBitangents[i].y;
-		vertex.bitangent.z = mesh->mBitangents[i].z;
+
 		vertices.push_back(vertex);
 	}
 
