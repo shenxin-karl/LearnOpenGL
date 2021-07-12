@@ -114,4 +114,3 @@ void Camera::update_wrold_axis() {
 	look_up = glm::normalize(glm::cross(world_x, look_at));
 }
 
-

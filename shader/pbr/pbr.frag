@@ -1,5 +1,7 @@
 #version 330 core
 
+out vec4 frag_color;
+
 in VS_OUT {
 	vec3	position;
 	vec2	texcoord;
@@ -17,8 +19,6 @@ uniform vec3  albedo;
 uniform float metallic;
 uniform float roughness;
 uniform samplerCube irradiance_env_map;		// 漫反射辐照度环境贴图
-
-out vec4 frag_color;
 
 const float PI = 3.1415926535898;
 

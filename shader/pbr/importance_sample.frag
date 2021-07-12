@@ -15,4 +15,24 @@ vec2 hammersley(uint i, uint N) {
     return vec2(float(i) / float(N), radical_inverse_vdc(i));
 }
 
+vec3 importance_sample_ggx(vec2 Xi, vec3 N, float rouhgness) {
+    float a = rouhgness * rouhgness;
+    float phi = 2.0 * PI * Xi.x;
+    float cos_theta = sqrt((1.0 - Xi.y) / (1 + (a*a - 1) * Xi.y));
+    float sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+    vec3 H = vec3(
+        sin_theta * cos_theta,
+        sin_theta * sin_theta,
+        cos_theta
+    );
+
+    vec3 up = (abs(N.z) < 0.999) ? vec3(0, 0, 1) : vec3(1, 0, 0);
+    vec3 right = normalize(cross(up, N));
+    up = normalize(cross(N, right));
+
+    vec3 sample_vec = (right * H.x) + (up * H.y) + (N * H.z);
+    return sample_vec;
+}
+
 #endif
