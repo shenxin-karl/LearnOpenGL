@@ -1,6 +1,6 @@
 #include "common.h"
 
-Preprocess::Preprocess(const std::string &path) : fin_(path, std::ios::in) {
+Preprocess::Preprocess(const std::string &path) : fin_(path, std::ios::in), condition_break_(false) {
 	if (!fin_.is_open()) {
 		std::cerr << path << "can be not find" << std::endl;
 		assert(false);
@@ -17,13 +17,13 @@ void Preprocess::parse(std::list<std::string> &strs) {
 	constexpr std::string_view keyword2 = "#include ";
 	constexpr std::string_view keyword3 = "#ifndef ";
 	constexpr std::string_view keyword4 = "#ifdef ";
+	constexpr std::string_view keyword5 = "#else";
 
 	std::string line;
 	while (!fin_.eof()) {
 		std::getline(fin_, line);
 		if (line.compare(0, keyword1.length(), keyword1) == 0) {			// #define
 			declare_.insert(trim_space(line.substr(keyword1.length()-1)));
-			strs.emplace_back(std::move(line));
 		} else if (line.compare(0, keyword2.length(), keyword2) == 0) {		// #include
 			std::string path = splic_directory(line.substr(keyword2.length()-1));
 			Preprocess pps(path);
@@ -31,17 +31,23 @@ void Preprocess::parse(std::list<std::string> &strs) {
 			std::list<std::string> result;
 			pps.parse(result);
 			strs.insert(strs.end(), std::make_move_iterator(result.begin()), std::make_move_iterator(result.end()));
-		} else if (line.compare(0, keyword3.length(), keyword3)) {			// #ifndef
+			continue;
+		} else if (line.compare(0, keyword3.length(), keyword3) == 0) {			// #ifndef
 			std::string key = trim_space(line.substr(keyword3.length()));
 			if (declare_.find(key) != declare_.end())
 				find_else_or_endif();
-		} else if (line.compare(0, keyword4.length(), keyword4)) {			// #ifdef
+			else
+				condition_break_ = true;
+		} else if (line.compare(0, keyword4.length(), keyword4) == 0) {			// #ifdef
 			std::string key = trim_space(line.substr(keyword4.length()));
 			if (declare_.find(key) == declare_.end())
 				find_else_or_endif();
-		} else {
-			strs.emplace_back(std::move(line));
+			else
+				condition_break_ = true;
+		} else if (condition_break_ && line.compare(0, keyword5.length(), keyword5) == 0) {		//#else
+			find_endif();
 		}
+		strs.emplace_back(std::move(line));
 	}
 }
 
@@ -89,18 +95,44 @@ std::string Preprocess::trim_space(std::string &&str) {
 	while (last > start && str[last] == ' ')
 		--last;
 	if (start == 0 && last == str.size()-1)
-		return;
+		return str;
 
 	str = str.substr(start, last - start + 1);
+	return str;
 }
 
 void Preprocess::find_else_or_endif() {
+	int size = 1;
 	std::string line;
-	while (!fin_.eof()) {
+	while (!fin_.eof() && size > 0) {
 		std::getline(fin_, line);
-		if (line.compare(0, 5, "#else") == 0)
-			return;
-		else if (line.compare(0, 6, "#endif"))
-			return;
+		if (line.compare(0, 3, "#if") == 0)
+			++size;
+		else if (line.compare(0, 6, "#ifdef") == 0)
+			++size;
+		else if (line.compare(0, 7, "#ifndef") == 0)
+			++size;
+		else if (line.compare(0, 6, "#endif") == 0)
+			--size;
+		else if (line.compare(0, 5, "#else") == 0)
+			--size;
 	}
 }
+
+void Preprocess::find_endif() {
+	int size = 1;
+	std::string line;
+	while (!fin_.eof() && size > 0) {
+		std::getline(fin_, line);
+		if (line.compare(0, 3, "#if") == 0)
+			++size;
+		else if (line.compare(0, 6, "#ifdef") == 0)
+			++size;
+		else if (line.compare(0, 7, "#ifndef") == 0)
+			++size;
+		else if (line.compare(0, 6, "#endif") == 0)
+			--size;
+	}
+
+}
+

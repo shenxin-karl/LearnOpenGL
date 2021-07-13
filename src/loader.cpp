@@ -436,7 +436,7 @@ GLuint Loader::irradiance_convolution(GLuint env_map, int width, int heght) {
 	return res;
 }
 
-GLuint Loader::prefiler(GLuint env_map, int width /*= 512*/, int height /*= 512*/) {
+GLuint Loader::prefilter(GLuint env_map, int width /*= 512*/, int height /*= 512*/) {
 	auto cube_ptr = Loader::create_trest_cube();
 	Shader prefilter_shader("shader/to_cube_map/to_cube_map.vert", "shader/pbr/prefilter.frag");
 	if (!prefilter_shader) {
@@ -444,7 +444,72 @@ GLuint Loader::prefiler(GLuint env_map, int width /*= 512*/, int height /*= 512*
 		return 0;
 	}
 
-	return 0;
+	GLuint prefilter_map;
+	glGenTextures(1, &prefilter_map);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map);
+	{
+		for (int i = 0; i < 6; ++i) {
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, width, height, 
+				0, GL_RGB, GL_FLOAT, nullptr);
+		}
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glGenerateMipmap(GL_TEXTURE_CUBE_MAP);
+	}
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	GLuint fbo;
+	GLuint rbo;
+	glGenFramebuffers(1, &fbo);
+	glGenRenderbuffers(1, &rbo);
+
+	glm::vec3 look_from(0, 0, 0);
+	glm::mat4 projection = glm::perspective(glm::radians(90.f), 1.f, 0.1f, 10.f);
+	glm::mat4 capture_view[] = {
+		glm::lookAt(look_from, glm::vec3(1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
+		glm::lookAt(look_from, glm::vec3(0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
+	};
+
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	{
+		prefilter_shader.use();
+		prefilter_shader.set_uniform("projection", projection);
+		prefilter_shader.set_uniform("env_map", 0);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, env_map);
+		constexpr int max_mip_level = 5;
+		for (int mip = 0; mip < max_mip_level; ++mip) {
+			int mip_width = width * std::pow(0.5, mip);
+			int mip_height = height * std::pow(0.5, mip);
+			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mip_width, mip_height);
+			glViewport(0, 0, mip_width, mip_height);
+			float roughness = float(mip) / float(max_mip_level - 1);
+			prefilter_shader.set_uniform("roughness", roughness);
+			for (int i = 0; i < 6; ++i) {
+				prefilter_shader.set_uniform("view", capture_view[i]);
+				glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 
+					GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, prefilter_map, mip);
+				glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+				cube_ptr->draw(prefilter_shader);
+			}
+		}
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glDeleteFramebuffers(1, &fbo);
+	glDeleteRenderbuffers(1, &rbo);
+	static int counter = 0;
+	std::string key = std::format("irradiance_convolution{}", ++counter);
+	texture_cache.insert(std::make_pair(key, prefilter_map));
+	return prefilter_map;
 }
 
 void Loader::destroy() {

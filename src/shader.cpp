@@ -1,17 +1,17 @@
 #include "common.h"
 
 Shader::Shader(const std::string &vertex_path, const std::string &fragment_path) : id(-1) {
-	std::ifstream vertex_file(vertex_path);
-	std::ifstream fragment_file(fragment_path);
-	if (!vertex_file.is_open() || !fragment_file.is_open()) {
-		std::cerr << "Can't open shader file" << std::endl;
-		return;
-	}
+	//std::ifstream vertex_file(vertex_path);
+	//std::ifstream fragment_file(fragment_path);
+	//if (!vertex_file.is_open() || !fragment_file.is_open()) {
+	//	std::cerr << "Can't open shader file" << std::endl;
+	//	return;
+	//}
 
 	const char *code_ptr = nullptr;
 	std::stringstream sbuf;
-	sbuf << vertex_file.rdbuf();
-	std::string vertex_content = sbuf.str();
+	//sbuf << vertex_file.rdbuf();
+	std::string vertex_content = Preprocess(vertex_path).parse();
 	code_ptr = vertex_content.c_str();
 
 	int success = 1;
@@ -27,9 +27,9 @@ Shader::Shader(const std::string &vertex_path, const std::string &fragment_path)
 		return;
 	}
 
-	sbuf.str({});
-	sbuf << fragment_file.rdbuf();
-	std::string fragment_content = sbuf.str();
+	//sbuf.str({});
+	//sbuf << fragment_file.rdbuf();
+	std::string fragment_content = Preprocess(fragment_path).parse();
 	code_ptr = fragment_content.c_str();
 
 	GLuint fragment_shader = glCreateShader(GL_FRAGMENT_SHADER);

@@ -621,12 +621,9 @@ void Scene::bloom() {
 }
 
 void Scene::pbr() {
-	Preprocess pps("shader/pbr/testfile");
-	auto str = pps.parse();
-
 	GLuint hdr_cube_map = Loader::equirectangular_to_cube_map("resources/skybox/Barce_Rooftop_C_3k.hdr");
 	GLuint irradiance_env_map = Loader::irradiance_convolution(hdr_cube_map);
-	GLuint prefilter_map = Loader::prefiler(hdr_cube_map);
+	GLuint prefilter_map = Loader::prefilter(hdr_cube_map);
 	auto sphere_ptr = Loader::create_sphere();
 	auto skybox_cube_ptr = Loader::create_skybox();
 	add_model(sphere_ptr);
@@ -712,8 +709,9 @@ void Scene::pbr() {
 		skybox_shader.use();
 		skybox_shader.set_uniform("view", camera_ptr->get_view());
 		skybox_shader.set_uniform("projection", camera_ptr->get_projection());
+		skybox_shader.set_uniform("roughness", roughness);
 		glActiveTexture(GL_TEXTURE0);
-		glBindTexture(GL_TEXTURE_CUBE_MAP, hdr_cube_map);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map);
 		skybox_shader.set_uniform("env_cube_map", 0);
 		skybox_cube_ptr->draw(skybox_shader);
 
