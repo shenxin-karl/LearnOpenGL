@@ -18,6 +18,7 @@
 #include <string_view>
 #include <filesystem>
 #include <format>
+#include <unordered_set>
 
 // stb_image
 #include <stb_image.h>
@@ -60,3 +61,4 @@ using uint = unsigned int;
 #include "camera.h"
 #include "utility.h"
 #include "scene.h"
+#include "preprocess.h"

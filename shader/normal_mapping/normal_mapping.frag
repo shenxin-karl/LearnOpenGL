@@ -10,6 +10,7 @@ in VS_OUT {
 
 uniform sampler2D diffuse_map1;
 uniform sampler2D normal_map1;
+uniform float bump_scale;
 
 out vec4 frag_color;
 
@@ -18,6 +19,8 @@ void main() {
 	vec3 view_dir = normalize(fs_in.tangent_view_dir);
 	vec3 light_dir = normalize(fs_in.tangent_light_dir);
 	vec3 normal = normalize(texture(normal_map1, fs_in.texcoord).rgb * 2 - 1);
+	normal.xy *= bump_scale;
+	normal = normalize(normal);
 	
 	// ambient
 	vec3 ambient = 0.2 * diffuse_color;

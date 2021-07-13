@@ -20,6 +20,7 @@ add_executable(LearnOpenGL
 	"include/scene.h"				"src/scene.cpp"		
  	"include/camera.h"				"src/camera.cpp"
 	"include/utility.h"				"src/utility.cpp" 
+	"include/preprocess.h"			"src/preprocess.cpp"
 )
 
 target_include_directories(LearnOpenGL PUBLIC

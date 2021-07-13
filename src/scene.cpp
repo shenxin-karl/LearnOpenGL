@@ -218,6 +218,7 @@ void Scene::normal_mapping() {
 	glBindTexture(GL_TEXTURE_2D, normal_map);
 	normal_mapping_shader.set_uniform("normal_map1", 1);
 
+	float bump_scale = 1.0;
 	glEnable(GL_DEPTH_TEST);
 	while (!glfwWindowShouldClose(window)) {
 		poll_event();
@@ -228,13 +229,20 @@ void Scene::normal_mapping() {
 		normal_mapping_shader.set_uniform("view", camera_ptr->get_view());
 		normal_mapping_shader.set_uniform("projection", camera_ptr->get_projection());
 		normal_mapping_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
+		normal_mapping_shader.set_uniform("bump_scale", bump_scale);
 
 		glm::mat4 light_rotate = glm::rotate(glm::mat4(1.f), float(glm::radians(glfwGetTime() * 5.f)), glm::vec3(0, 1, 0));
 		glm::vec3 new_light_dir = light_rotate * glm::vec4(light_dir, 1.f);
 		normal_mapping_shader.set_uniform("light_dir", new_light_dir);
 		plane_ptr->draw(normal_mapping_shader);
-		CheckError();
-		glfwSwapBuffers(window);
+
+		ImGui::Begin("normal mapping");
+		{
+			ImGui::InputFloat("bump scale", &bump_scale);
+		}
+		ImGui::End();
+
+		swap_buffer();
 	}
 }
 
@@ -613,8 +621,12 @@ void Scene::bloom() {
 }
 
 void Scene::pbr() {
+	Preprocess pps("shader/pbr/testfile");
+	auto str = pps.parse();
+
 	GLuint hdr_cube_map = Loader::equirectangular_to_cube_map("resources/skybox/Barce_Rooftop_C_3k.hdr");
 	GLuint irradiance_env_map = Loader::irradiance_convolution(hdr_cube_map);
+	GLuint prefilter_map = Loader::prefiler(hdr_cube_map);
 	auto sphere_ptr = Loader::create_sphere();
 	auto skybox_cube_ptr = Loader::create_skybox();
 	add_model(sphere_ptr);

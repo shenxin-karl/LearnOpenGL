@@ -436,6 +436,17 @@ GLuint Loader::irradiance_convolution(GLuint env_map, int width, int heght) {
 	return res;
 }
 
+GLuint Loader::prefiler(GLuint env_map, int width /*= 512*/, int height /*= 512*/) {
+	auto cube_ptr = Loader::create_trest_cube();
+	Shader prefilter_shader("shader/to_cube_map/to_cube_map.vert", "shader/pbr/prefilter.frag");
+	if (!prefilter_shader) {
+		std::cerr << "Failed initialize prefilter shader " << std::endl;
+		return 0;
+	}
+
+	return 0;
+}
+
 void Loader::destroy() {
 	for (auto &&[_, ptr] : image_cache) {
 		if (ptr != nullptr && ptr->data != nullptr)
