@@ -8,7 +8,7 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
 }
 
 vec3 fresnel_schlick_roughness(float cos_theta, vec3 F0, float roughness) {
-	return F0 + (max(1.0 - roughness, 0) - F0) * pow(1.0 - cos_theta, 5.0);
+	return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1.0 - cos_theta, 5.0);
 }
 
 float gemontry_schlick_ggx(float NdotV, float k) {

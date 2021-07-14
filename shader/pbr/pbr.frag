@@ -19,17 +19,19 @@ uniform vec3  albedo;
 uniform float metallic;
 uniform float roughness;
 uniform samplerCube irradiance_env_map;		// 漫反射辐照度环境贴图
+uniform samplerCube prefilter_map;		
+uniform sampler2D	brdf_lut_map;			
 
 const float PI = 3.1415926535898;
 
 vec3 fresnel_schlick(vec3 H, vec3 V, vec3 F0) {
 	float HdotV = max(dot(H, V), 1.0);
-	return F0 + (1.0 - F0) * pow(HdotV, 5.0);
+	return F0 + (1.0 - F0) * pow(1.0 - HdotV, 5.0);
 }
 
 vec3 fresnel_schlick_roughness(vec3 N, vec3 V, vec3 F0, float roughness) {
 	float NdotV = max(dot(N, V), 0.0);
-	return F0 + (max(vec3(1.0 - roughness), 0.0) - F0) * pow(1 - NdotV, 5.0);
+	return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(1 - NdotV, 5.0);
 }
 
 float distribution_ggx(vec3 N, vec3 H, float roughness) {
@@ -62,8 +64,9 @@ float geometry_smith(vec3 N, vec3 L, vec3 V, float roughness) {
 void main() {
 	vec3 V = normalize(view_pos - fs_in.position);
 	vec3 N = normalize(fs_in.normal);
+	vec3 R = reflect(-V, N);
 
-	vec3 F0 = vec3(0.03);
+	vec3 F0 = vec3(0.04);
 	F0      = mix(F0, albedo, metallic);
 
 	vec3 Lo = vec3(0);
@@ -93,10 +96,15 @@ void main() {
 
 	// 使用 IBM 预处理的漫反射
 	vec3 Ks		    = fresnel_schlick_roughness(N, V, F0, roughness);
-	vec3 Kd			= 1.0 - Ks;
+	vec3 Kd			= (1.0 - Ks) * (1.0 - metallic);
 	vec3 irradiance = texture(irradiance_env_map, N).rgb;
-	vec3 diffuse    = irradiance * albedo;
-	vec3 ambient	= Kd * diffuse;
+	vec3 diffuse    = Kd * irradiance * albedo;
+	
+	const float MAX_ROUGHNESS_LEVEL = 4.0;
+	vec3 prefilter_color = textureLod(prefilter_map, R, roughness * MAX_ROUGHNESS_LEVEL).rgb;
+	vec3 env_brdf        = texture(brdf_lut_map, vec2(max(dot(N, V), 0.0), roughness)).rgb;
+	vec3 specular		 = prefilter_color * (Ks * env_brdf.x + env_brdf.y);
+	vec3 ambient		 = diffuse + specular;
 
 	vec3 color   = Lo + ambient;
 	color		 = color / (color + vec3(1));		// HDR

@@ -512,6 +512,52 @@ GLuint Loader::prefilter(GLuint env_map, int width /*= 512*/, int height /*= 512
 	return prefilter_map;
 }
 
+GLuint Loader::brdf_lut(GLuint env_map, int width /*= 512*/, int height /*= 512*/) {
+	auto quad_ptr = Loader::create_quad();
+	Shader brdf_shader("shader/pbr/integrate_brdf.vert", "shader/pbr/integrate_brdf.frag");
+	if (!brdf_shader) {
+		std::cerr << "Failed initialize brdf_shader error" << std::endl;
+		return 0;
+	}
+
+	GLuint integrate_brdf_map;
+	glGenTextures(1, &integrate_brdf_map);
+	glBindTexture(GL_TEXTURE_2D, integrate_brdf_map);
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+	GLuint fbo;
+	GLuint rbo;
+	glGenFramebuffers(1, &fbo);
+	glGenRenderbuffers(1, &rbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+	{
+		glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, width, height);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, integrate_brdf_map, 0);
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		brdf_shader.use();
+		brdf_shader.set_uniform("env_map", 0);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, env_map);
+		quad_ptr->draw(brdf_shader);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glDeleteFramebuffers(1, &fbo);
+	glDeleteRenderbuffers(1, &rbo);
+	static int counter = 0;
+	std::string key = std::format("integrate_brdf{}", ++counter);
+	texture_cache.insert(std::make_pair(key, integrate_brdf_map));
+	return integrate_brdf_map;
+}
+
 void Loader::destroy() {
 	for (auto &&[_, ptr] : image_cache) {
 		if (ptr != nullptr && ptr->data != nullptr)

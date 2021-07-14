@@ -21,7 +21,7 @@ vec3 prefilter(vec3 local_pos) {
 		vec3 L  = normalize(2.0 * dot(V, H) * H - V);
 		float NdotL = max(dot(N, L), 0.0);
 		if (NdotL > 0.0) {
-			prefilted_color += texture(env_map, L).rgb;
+			prefilted_color += texture(env_map, L).rgb * NdotL;
 			total_weight	+= NdotL;
 		}
 	}

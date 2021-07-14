@@ -46,6 +46,7 @@ void Preprocess::parse(std::list<std::string> &strs) {
 				condition_break_ = true;
 		} else if (condition_break_ && line.compare(0, keyword5.length(), keyword5) == 0) {		//#else
 			find_endif();
+			condition_break_ = false;
 		}
 		strs.emplace_back(std::move(line));
 	}
