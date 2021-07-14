@@ -27,7 +27,8 @@ int main(void) {
 	//parallax_mapping();
 	//shadow_mapping();
 	//bloom();
-	pbr();
+	//pbr();
 	//to_cube_map_test();
+	AK47();
 	destroy();
 }

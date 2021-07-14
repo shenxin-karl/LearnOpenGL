@@ -46,4 +46,5 @@ public:
 	void bloom();
 	void pbr();
 	void to_cube_map_test();
+	void AK47();
 };

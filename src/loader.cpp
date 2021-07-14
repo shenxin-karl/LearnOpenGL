@@ -663,16 +663,28 @@ Mesh Loader::process_mesh(aiMesh *mesh, const aiScene *scene, std::shared_ptr<Mo
 	int index = mesh->mNumAnimMeshes;
 	if (index >= 0) {
 		aiMaterial *material = scene->mMaterials[index];
+#if 1
 		std::vector<Texture> diffuse_map = load_material_textures(material, aiTextureType_DIFFUSE, "diffuse_map", model_ptr);
 		textures.insert(textures.end(), std::move_iterator(diffuse_map.begin()), std::move_iterator(diffuse_map.end()));
 		std::vector<Texture> specular_map = load_material_textures(material, aiTextureType_SPECULAR, "specular_map", model_ptr);
 		textures.insert(textures.end(), std::move_iterator(specular_map.begin()), std::move_iterator(specular_map.end()));
-		std::vector<Texture> normal_map = load_material_textures(material, aiTextureType_NORMALS, "normal_map", model_ptr);
+		std::vector<Texture> normal_map = load_material_textures(material, aiTextureType_HEIGHT, "normal_map", model_ptr);
 		textures.insert(textures.end(), std::move_iterator(normal_map.begin()), std::move_iterator(normal_map.end()));
-		std::vector<Texture> height_map = load_material_textures(material, aiTextureType_HEIGHT, "height_map", model_ptr);
-		textures.insert(textures.end(), std::move_iterator(height_map.begin()), std::move_iterator(height_map.end()));
+#else
+		auto albedo_map = load_material_textures(material, aiTextureType_BASE_COLOR, "albedo_map", model_ptr);
+		textures.insert(textures.end(), std::move_iterator(albedo_map.begin()), std::move_iterator(albedo_map.end()));
+		auto normal_map = load_material_textures(material, aiTextureType_NORMAL_CAMERA, "normal_map", model_ptr);
+		textures.insert(textures.end(), std::move_iterator(normal_map.begin()), std::move_iterator(normal_map.end()));
+		auto emission_map = load_material_textures(material, aiTextureType_EMISSION_COLOR, "emission_map", model_ptr);
+		textures.insert(textures.end(), std::move_iterator(emission_map.begin()), std::move_iterator(emission_map.end()));
+		auto metallic_map = load_material_textures(material, aiTextureType_METALNESS, "metallic_map", model_ptr);
+		textures.insert(textures.end(), std::move_iterator(metallic_map.begin()), std::move_iterator(metallic_map.end()));
+		auto roughness_map = load_material_textures(material, aiTextureType_DIFFUSE_ROUGHNESS, "roughness_map", model_ptr);
+		textures.insert(textures.end(), std::move_iterator(roughness_map.begin()), std::move_iterator(roughness_map.end()));
+		auto ambient_occlusion = load_material_textures(material, aiTextureType_AMBIENT_OCCLUSION, "ambient_occlusion", model_ptr);
+		textures.insert(textures.end(), std::move_iterator(ambient_occlusion.begin()), std::move_iterator(ambient_occlusion.end()));
+#endif
 	}
-
 	return { std::move(vertices), std::move(indices), std::move(textures) };
 }
 

@@ -770,3 +770,103 @@ void Scene::to_cube_map_test() {
 	}
 	return;
 }
+
+void Scene::AK47() {
+	GLuint hdr_cube_map = Loader::equirectangular_to_cube_map("resources/skybox/Factory_Catwalk_2k.hdr", 1024, 1024);
+	GLuint irradiance_map = Loader::irradiance_convolution(hdr_cube_map);
+	GLuint prefilter_map = Loader::prefilter(hdr_cube_map);
+	GLuint brdf_lut_map = Loader::brdf_lut(hdr_cube_map);
+
+	GLuint albedo_map = Loader::load_texture2ds("resources/AK47/textures/AK47_albedo.tga");
+	GLuint ambient_occlusion_map = Loader::load_texture2ds("resources/AK47/textures/AK47_ao.tga");
+	GLuint normal_map = Loader::load_texture2d("resources/AK47/textures/AK47_normal.tga");
+	GLuint metallic_map = Loader::load_texture2d("resources/AK47/textures/AK47_metalness.tga");
+	GLuint roughness_map = Loader::load_texture2d("resources/AK47/textures/AK47_roughness.tga");
+
+	auto ak47_model = Loader::load_model("resources/AK47/AK47.obj");
+	auto skybox_ptr = Loader::create_skybox();
+
+	Shader skybox_shader("shader/skybox/skybox.vert", "shader/skybox/skybox.frag");
+	Shader ibl_shader("shader/IBL/ibl.vert", "shader/IBL/ibl.frag");
+	if (!ibl_shader) {
+		std::cerr << "Failed initialize ibl_shader" << std::endl;
+		return;
+	}
+
+	constexpr int light_size = 4;
+	glm::vec3 light_position[light_size] = {
+		glm::vec3(-10.0f,  10.0f, 10.0f),
+		glm::vec3(10.0f,  10.0f, 10.0f),
+		glm::vec3(-10.0f, -10.0f, 10.0f),
+		glm::vec3(10.0f, -10.0f, 10.0f),
+	};
+	glm::vec3 light_colors[light_size] = {
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+		glm::vec3(300.0f, 300.0f, 300.0f),
+	};
+
+	// bind texture
+	{
+		ibl_shader.use();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map);
+		ibl_shader.set_uniform("irradiance_map", 0);
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map);
+		ibl_shader.set_uniform("prefilter_map", 1);
+		glActiveTexture(GL_TEXTURE2);
+		glBindTexture(GL_TEXTURE_2D, brdf_lut_map);
+		ibl_shader.set_uniform("brdf_lut_map", 2);
+		glActiveTexture(GL_TEXTURE3);
+		glBindTexture(GL_TEXTURE_2D, albedo_map);
+		ibl_shader.set_uniform("albedo_map", 3);
+		glActiveTexture(GL_TEXTURE4);
+		glBindTexture(GL_TEXTURE_2D, normal_map);
+		ibl_shader.set_uniform("normal_map", 4);
+		glActiveTexture(GL_TEXTURE5);
+		glBindTexture(GL_TEXTURE_2D, metallic_map);
+		ibl_shader.set_uniform("metallic_map", 5);
+		glActiveTexture(GL_TEXTURE6);
+		glBindTexture(GL_TEXTURE_2D, roughness_map);
+		ibl_shader.set_uniform("roughness_map", 6);
+		glActiveTexture(GL_TEXTURE7);
+		glBindTexture(GL_TEXTURE_2D, ambient_occlusion_map);
+		ibl_shader.set_uniform("ambient_occlusion_map", 7);
+
+		skybox_shader.use();
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, hdr_cube_map);
+	}
+
+	glViewport(0, 0, width, height);
+	glEnable(GL_DEPTH_TEST);
+	glDepthFunc(GL_LEQUAL);
+	glEnable(GL_CULL_FACE);		
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		ibl_shader.use();
+		ibl_shader.set_uniform("model", glm::mat4(1.0));
+		ibl_shader.set_uniform("view", camera_ptr->get_view());
+		ibl_shader.set_uniform("projection", camera_ptr->get_projection());
+		ibl_shader.set_uniform("view_pos", camera_ptr->get_look_from());
+		CheckError();
+		for (int i = 0; i < light_size; ++i) {
+			std::string var_pos = std::format("lights[{}].position", i);
+			std::string var_col = std::format("lights[{}].color", i);
+			ibl_shader.set_uniform(var_pos, light_position[i]);
+			ibl_shader.set_uniform(var_col, light_colors[i]);
+			CheckError();
+		}
+		ak47_model->draw(ibl_shader);
+
+		skybox_shader.use();
+		skybox_shader.set_uniform("view", camera_ptr->get_view());
+		skybox_shader.set_uniform("projection", camera_ptr->get_projection());
+		skybox_ptr->draw(skybox_shader);
+		swap_buffer();
+	}
+}
