@@ -4,7 +4,7 @@ class Shader {
 	GLuint	id;
 	std::unordered_map<std::string, GLint> uniform_location_cache;
 public:
-	Shader(const std::string &vertex_path, const std::string &fragment_path);
+	Shader(const std::string &vertex_path, const std::string &fragment_path, const std::string &geometry_path = {});
 	Shader(Shader &&other) noexcept;
 	Shader(const Shader &) = delete;
 	explicit operator bool() const noexcept;

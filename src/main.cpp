@@ -29,6 +29,7 @@ int main(void) {
 	//bloom();
 	//pbr();
 	//to_cube_map_test();
-	AK47();
+	//AK47();
+	house();
 	destroy();
 }

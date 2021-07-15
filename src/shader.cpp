@@ -1,6 +1,6 @@
 #include "common.h"
 
-Shader::Shader(const std::string &vertex_path, const std::string &fragment_path) : id(-1) {
+Shader::Shader(const std::string &vertex_path, const std::string &fragment_path, const std::string &geometry_path) : id(-1) {
 	//std::ifstream vertex_file(vertex_path);
 	//std::ifstream fragment_file(fragment_path);
 	//if (!vertex_file.is_open() || !fragment_file.is_open()) {
@@ -45,6 +45,22 @@ Shader::Shader(const std::string &vertex_path, const std::string &fragment_path)
 	GLuint shader_program = glCreateProgram();
 	glAttachShader(shader_program, vertex_shader);
 	glAttachShader(shader_program, fragment_shader);
+
+	GLuint house = glCreateShader(GL_GEOMETRY_SHADER);
+	if (!geometry_path.empty()) {
+		std::string geometry_content = Preprocess(geometry_path).parse();
+		code_ptr = geometry_content.c_str();
+		glShaderSource(house, 1, &code_ptr, nullptr);
+		glCompileShader(house);
+		glGetShaderiv(house, GL_COMPILE_STATUS, &success);
+		if (!success) {
+			glGetShaderInfoLog(house, sizeof(errmsg), nullptr, errmsg);
+			std::cerr << "Compile geometry shader error:" << errmsg << std::endl;
+			return;
+		}
+		glAttachShader(shader_program, house);
+	}
+
 	glLinkProgram(shader_program);
 	glGetProgramiv(shader_program, GL_LINK_STATUS, &success);
 	if (!success) {
@@ -55,6 +71,7 @@ Shader::Shader(const std::string &vertex_path, const std::string &fragment_path)
 
 	glDeleteShader(vertex_shader);
 	glDeleteShader(fragment_shader);
+	glDeleteShader(house);
 	id = shader_program;
 }
 
