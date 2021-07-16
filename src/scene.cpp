@@ -918,3 +918,59 @@ void Scene::house() {
 	glDeleteVertexArrays(1, &VAO);
 	glDeleteBuffers(1, &VBO);
 }
+
+void Scene::explode() {
+	auto alod_ptr = Loader::load_model("resources/alod/dino obj.obj");
+	auto diffuse_map = Loader::load_texture2ds("resources/alod/dino.jpg");
+	
+	Shader explode_shader("shader/explode/explode.vert", "shader/explode/explode.frag", "shader/explode/explode.geom");
+	if (!explode_shader) {
+		std::cerr << "Failed initialize explode shader" << std::endl;
+		return;
+	}
+
+	Shader normal_display("shader/normal_display/normal_display.vert", "shader/normal_display/normal_display.frag",
+		"shader/normal_display/normal_display.geom");
+	if (!normal_display) {
+		std::cerr << "Failed normal_display explode shader" << std::endl;
+		return;
+	}
+
+	glm::vec3 light_pos = glm::vec3(30, 30, 30);
+	glm::vec3 light_color = glm::vec3(1.f, 1.f, 1.f);
+	explode_shader.use();
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, diffuse_map);
+	explode_shader.set_uniform("diffuse_map", 0);
+	explode_shader.set_uniform("light_pos", light_pos);
+	explode_shader.set_uniform("light_color", light_color);
+
+	float offset = 0.0f;
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		
+		explode_shader.use();
+		explode_shader.set_uniform("model", glm::mat4(1));
+		explode_shader.set_uniform("view", camera_ptr->get_view());
+		explode_shader.set_uniform("projection", camera_ptr->get_projection());
+		explode_shader.set_uniform("view_pos", camera_ptr->get_look_from());
+		explode_shader.set_uniform("offset", offset);
+		alod_ptr->draw(explode_shader);
+
+		normal_display.use();
+		normal_display.set_uniform("model", glm::mat4(1));
+		normal_display.set_uniform("view", camera_ptr->get_view());
+		normal_display.set_uniform("projection", camera_ptr->get_projection());
+		alod_ptr->draw(normal_display);
+
+		ImGui::Begin("explode param");
+		{
+			ImGui::DragFloat("offset", &offset, 0.1f, 0.f, 30.f);
+		}
+		ImGui::End();
+		swap_buffer();
+	}
+}

@@ -30,6 +30,7 @@ int main(void) {
 	//pbr();
 	//to_cube_map_test();
 	//AK47();
-	house();
+	//house();
+	explode();
 	destroy();
 }
