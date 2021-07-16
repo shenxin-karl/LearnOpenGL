@@ -879,9 +879,9 @@ void Scene::house() {
 	}
 
 	float points[] = {
-		-0.5f,  0.5f, 1.0f, 0.0f, 0.0f,	// 左上
-		 0.5f,  0.5f, 0.0f, 1.0f, 0.0f,	// 右上
-		 0.5f, -0.5f, 0.0f, 0.0f, 1.0f,	// 右下
+		-0.5f, +0.5f, 1.0f, 0.0f, 0.0f,	// 左上
+		+0.5f, +0.5f, 0.0f, 1.0f, 0.0f,	// 右上
+		+0.5f, -0.5f, 0.0f, 0.0f, 1.0f,	// 右下
 		-0.5f, -0.5f, 1.0f, 1.0f, 0.0f	// 左下
 	};
 
@@ -909,7 +909,7 @@ void Scene::house() {
 		house_shader.use();
 		glBindVertexArray(VAO);
 		{
-			glDrawArrays(GL_POINTS, 0, std::size(points) / 2);
+			glDrawArrays(GL_POINTS, 0, 4);
 		}
 		glBindVertexArray(0);
 		swap_buffer();
