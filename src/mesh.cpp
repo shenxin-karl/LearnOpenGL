@@ -73,6 +73,29 @@ void Mesh::draw(Shader &shader) const {
 	glBindVertexArray(0);
 }
 
+
+void Mesh::draw_instance(Shader &shader, int count) const {
+	shader.use();
+	std::unordered_map<aiTextureType, int> type_counter;
+	int i = 0;
+	for (auto &texture : textures) {
+		glActiveTexture(GL_TEXTURE0 + i);
+		glBindTexture(GL_TEXTURE_2D, texture.obj);
+		int count = type_counter[texture.type] + 1;
+		type_counter[texture.type]++;
+		std::string uniform_name = texture.var_name + std::to_string(count);
+		shader.set_uniform(uniform_name, i);
+		++i;
+	}
+	glBindVertexArray(VAO);
+	glDrawElementsInstanced(draw_type_, GLsizei(indices.size()), GL_UNSIGNED_INT, nullptr, count);
+	glBindVertexArray(0);
+}
+
+GLuint Mesh::get_VAO() const {
+	return VAO;
+}
+
 Mesh::~Mesh() {
 	if (VAO != 0) glDeleteVertexArrays(1, &VAO);
 	if (VBO != 0) glDeleteBuffers(1, &VBO);

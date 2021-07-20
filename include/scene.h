@@ -49,4 +49,6 @@ public:
 	void AK47();
 	void house();
 	void explode();
+	void instantiation();
+	void planet();
 };

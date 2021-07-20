@@ -54,9 +54,6 @@ void Camera::mouse_callback(double offset_x, double offset_y) {
 }
 
 void Camera::scroll_callback(double offset) {
-	if (!enable_mouse)
-		return;
-
 	fov = std::clamp(fov + float(-offset * sensitivity), 0.1f, 89.f);
 }
 

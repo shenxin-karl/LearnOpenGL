@@ -974,3 +974,171 @@ void Scene::explode() {
 		swap_buffer();
 	}
 }
+
+void Scene::instantiation() {
+	Shader shader("shader/instantiation/instantiation.vert", "shader/instantiation/instantiation.frag");
+	if (!shader) {
+		std::cerr << "Failed intialize shader" << std::endl;
+		return;
+	}
+
+	float quad_vertices[] = {
+		// 位置          // 颜色
+		-0.05f,  0.05f,  1.0f, 0.0f, 0.0f,
+		 0.05f, -0.05f,  0.0f, 1.0f, 0.0f,
+		-0.05f, -0.05f,  0.0f, 0.0f, 1.0f,
+
+		-0.05f,  0.05f,  1.0f, 0.0f, 0.0f,
+		 0.05f, -0.05f,  0.0f, 1.0f, 0.0f,
+		 0.05f,  0.05f,  0.0f, 1.0f, 1.0f
+	};
+
+	glm::vec2 offsets[100];
+	int index = 0;
+	for (int x = -10; x < 10; x += 2) {
+		for (int y = -10; y < 10; y += 2) {
+			glm::vec2 translates;
+			translates.x = x / 10.f + 0.1f;
+			translates.y = y / 10.f + 0.1f;
+			offsets[index++] = translates;
+		}
+	}
+
+	GLuint VAO;
+	GLuint VBO;
+	GLuint instance_VBO;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glGenBuffers(1, &instance_VBO);
+	glBindVertexArray(VAO);
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(quad_vertices), quad_vertices, GL_STATIC_DRAW);
+
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(float)*5, (void *)0);
+		glEnableVertexAttribArray(1);
+		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(float)*5, (void *)(sizeof(float)*2));
+
+		glBindBuffer(GL_ARRAY_BUFFER, instance_VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(offsets), offsets, GL_STATIC_DRAW);
+		glEnableVertexAttribArray(2);
+		glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(float)*2, (void *)0);
+		glVertexAttribDivisor(2, 1);
+	}
+	glBindVertexArray(0);
+
+	//shader.use();
+	//for (int i = 0; i < std::size(offsets); ++i) {
+	//	std::string var = std::format("offsets[{}]", i);
+	//	shader.set_uniform(var, offsets[i]);
+	//}
+
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClear(GL_COLOR_BUFFER_BIT);
+		shader.use();
+		glBindVertexArray(VAO);
+		{
+			glDrawArraysInstanced(GL_TRIANGLES, 0, 6, 100);
+		}
+		glBindVertexArray(0);
+		swap_buffer();
+	}
+
+	glDeleteBuffers(1, &VBO);
+	glDeleteVertexArrays(1, &VAO);
+}
+
+void Scene::planet() {
+	auto planet_ptr = Loader::load_model("resources/planet/planet.obj");
+	auto rock_ptr = Loader::load_model("resources/planet/rock.obj");
+	GLuint planet_diffuse_map = Loader::load_texture2ds("resources/planet/planet_Quom1200.png");
+	GLuint rock_diffuse_map = Loader::load_texture2ds("resources/planet/Rock-Texture-Surface.jpg");
+
+	Shader shader("shader/planet/planet.vert", "shader/planet/palent.frag");
+	if (!shader) {
+		std::cerr << "failed initialize shader" << std::endl;
+		return;
+	}
+
+	unsigned int amout = 50000;
+	std::vector<glm::mat4> model_matrices;
+	model_matrices.reserve(amout);
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<float> dis(0.f, 1.0);
+	float radius = 50.f;
+	float offset = 2.5f;
+	for (unsigned int i = 0; i < amout; ++i) {
+		// 位移
+		float angle = float(i) / float(amout) * 360.f;
+		float displacement = mix(-offset, offset, dis(gen));
+		float x = std::sin(angle) * radius + displacement;
+		float y = displacement * 0.4f;
+		displacement = mix(-offset, offset, dis(gen));
+		float z = std::cos(angle) * radius + displacement;
+		glm::mat4 model = glm::translate(glm::mat4(1.f), glm::vec3(x, y, z));
+
+		// 缩放在 0.05 和 0.25 之间
+		float scale = mix(0.05f, 0.25f, dis(gen));
+		model = glm::scale(model, glm::vec3(scale));
+
+		// 旋转
+		float rot_angle = dis(gen) * 360.f;
+		model = glm::rotate(model, rot_angle, glm::vec3(0.4f, 0.6f, 0.8f));
+
+		model_matrices.emplace_back(model);
+	}
+
+	GLuint VAO = rock_ptr->get_mesh_VAO(0);
+	GLuint instance_VBO;
+	glGenBuffers(1, &instance_VBO);
+	glBindVertexArray(VAO);
+	{
+		glBindBuffer(GL_ARRAY_BUFFER, instance_VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * model_matrices.size(), model_matrices.data(), GL_STATIC_DRAW);
+		constexpr size_t vec4_size = sizeof(glm::vec4);
+		glEnableVertexAttribArray(5);
+		glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void *)0);
+		glEnableVertexAttribArray(6);
+		glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void *)(vec4_size));
+		glEnableVertexAttribArray(7);
+		glVertexAttribPointer(7, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void *)(vec4_size * 2));
+		glEnableVertexAttribArray(8);
+		glVertexAttribPointer(8, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4), (void *)(vec4_size * 3));
+		glVertexAttribDivisor(5, 1);
+		glVertexAttribDivisor(6, 1);
+		glVertexAttribDivisor(7, 1);
+		glVertexAttribDivisor(8, 1);
+	}
+	glBindVertexArray(0);
+
+	glm::mat4 model(1);
+	model = glm::translate(model, glm::vec3(0.0f, -3.0f, 0.0f));
+	model = glm::scale(model, glm::vec3(4.0f, 4.0f, 4.0f));
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		shader.use();
+		glBindTexture(GL_TEXTURE_2D, planet_diffuse_map);
+		shader.set_uniform("diffuse_map", 0);
+		shader.set_uniform("model", model);
+		shader.set_uniform("view", camera_ptr->get_view());
+		shader.set_uniform("projection", camera_ptr->get_projection());
+		shader.set_uniform("is_planet", true);
+		planet_ptr->draw(shader);
+
+		glBindTexture(GL_TEXTURE_2D, rock_diffuse_map);
+		shader.set_uniform("diffuse_map", 0);
+		shader.set_uniform("is_planet", false);
+		auto movement = glm::rotate(glm::mat4(1), float(glfwGetTime() / 30.f), glm::vec3(0, 1, 0));
+		shader.set_uniform("movement", movement);
+		rock_ptr->draw_instance(shader, amout);
+
+		swap_buffer();
+	}
+}

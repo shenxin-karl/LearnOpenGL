@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <format>
 #include <unordered_set>
+#include <random>
 
 // stb_image
 #include <stb_image.h>

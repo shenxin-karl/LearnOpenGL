@@ -31,6 +31,8 @@ int main(void) {
 	//to_cube_map_test();
 	//AK47();
 	//house();
-	explode();
+	//explode();
+	//instantiation();
+	planet();
 	destroy();
 }

@@ -4,9 +4,15 @@ Model::Model() : model_(1) {
 }
 
 void Model::draw(Shader &shader) const {
-	shader.set_uniform("model", model_);
+	//shader.set_uniform("model", model_);
 	for (auto &mesh : meshs)
 		mesh.draw(shader);
+}
+
+
+void Model::draw_instance(Shader &shader, int count) const {
+	for (auto &mesh : meshs)
+		mesh.draw_instance(shader, count);
 }
 
 const std::string &Model::get_name() const {
@@ -36,5 +42,9 @@ void Model::show_widgets() {
 
 const std::vector<Mesh> &Model::get_meshs() {
 	return meshs;
+}
+
+GLuint Model::get_mesh_VAO(int index) const {
+	return meshs.at(index).get_VAO();
 }
 

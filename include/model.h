@@ -9,8 +9,10 @@ class Model {
 public:
 	Model();
 	void draw(Shader &shader) const;
+	void draw_instance(Shader &shader, int count) const;
 	const std::string &get_name() const;
 	void set_model(const glm::mat4 &model);
 	void show_widgets();
 	const std::vector<Mesh> &get_meshs();
+	GLuint get_mesh_VAO(int index) const;
 };

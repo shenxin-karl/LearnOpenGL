@@ -53,8 +53,8 @@ GLFWwindow *create_window(int width, int height, const std::string &title) {
 	return window;
 }
 
-constexpr int g_width = 400;
-constexpr int g_height = 400;
+constexpr int g_width = 1200;
+constexpr int g_height = 800;
 constexpr float g_aspect = float(g_width) / float(g_height);
 constexpr float g_near = 0.1f;
 constexpr float g_far = 1000.f;
@@ -176,5 +176,28 @@ void explode() {
 	camera_ptr->set_aspect(g_aspect);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
 	scene.explode();
+	glfwDestroyWindow(window);
+}
+
+void instantiation() {
+	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(-0.5, -2.f, 30);
+	glm::vec3 look_up(0, 1, 0);
+	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
+	camera_ptr->set_aspect(g_aspect);
+	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
+	scene.instantiation();
+	glfwDestroyWindow(window);
+}
+
+void planet() {
+	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(-135.f, 26.f, -6.f);
+	glm::vec3 look_up(0, 1, 0);
+	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
+	camera_ptr->set_aspect(g_aspect);
+	camera_ptr->init_euler_angle(-21.f, 0.f);
+	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
+	scene.planet();
 	glfwDestroyWindow(window);
 }

@@ -29,5 +29,7 @@ public:
 	Mesh(Mesh &&other) noexcept;
 	Mesh &operator=(Mesh &&other) noexcept;
 	void draw(Shader &shader) const;
+	void draw_instance(Shader &shader, int count) const;
+	GLuint get_VAO() const;
 	~Mesh();
 };
