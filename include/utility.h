@@ -24,3 +24,4 @@ void house();
 void explode();
 void instantiation();
 void planet();
+void point_shadow();

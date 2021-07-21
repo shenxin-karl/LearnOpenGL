@@ -365,6 +365,7 @@ void Scene::shadow_mapping() {
 		// 渲染深度贴图
 		glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
 		{
+
 			glCullFace(GL_FRONT);		// 渲染场景深度贴图使用正面剔除, 避免悬浮问题出现
 			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 			glClear(GL_DEPTH_BUFFER_BIT);
@@ -1141,4 +1142,148 @@ void Scene::planet() {
 
 		swap_buffer();
 	}
+}
+
+void Scene::point_shadow() {
+	auto plane_ptr = Loader::create_test_plane();
+	auto cube_ptr = Loader::create_trest_cube();
+	GLuint plane_diffuse_map = Loader::load_texture2ds("resources/test_plane/wood.png");
+	GLuint cube_diffuse_map = Loader::load_texture2ds("resources/test_cube/container2.png");
+	Shader shader("shader/point_shadow/point_shadow.vert", "shader/point_shadow/point_shadow.frag");
+	Shader single_color_shader("shader/bloom/single_color.vert", "shader/bloom/single_color.frag");
+	Shader sample_depth_shader("shader/point_shadow/sample_depth.vert", "shader/point_shadow/sample_depth.frag", 
+		"shader/point_shadow/sample_depth.geom");
+
+	int SHADOW_WIDTH = 1024;
+	int SHADOW_HEIGHT = 1024;
+
+	GLuint depth_cube_map;
+	glGenTextures(1, &depth_cube_map);
+	glBindTexture(GL_TEXTURE_CUBE_MAP, depth_cube_map);
+	{
+		for (int i = 0; i < 6; ++i) {
+			glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_DEPTH_COMPONENT, SHADOW_WIDTH, SHADOW_HEIGHT, 
+				0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		}
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	}
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+
+	GLuint depth_fbo;
+	GLuint depth_rbo;
+	glGenFramebuffers(1, &depth_fbo);
+	glGenRenderbuffers(1, &depth_rbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+	{
+		glBindRenderbuffer(GL_RENDERBUFFER, depth_rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, SHADOW_WIDTH, SHADOW_HEIGHT);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, depth_rbo);
+
+		glFramebufferTexture(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, depth_cube_map, 0);
+		glDrawBuffer(GL_NONE);		
+		glReadBuffer(GL_NONE);		
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glm::mat4 plane_scale = glm::scale(glm::mat4(1.f), glm::vec3(10.f, 1, 10.f));
+	glm::mat4 plane_trans_matrix = glm::rotate(plane_scale, glm::radians(90.f), glm::vec3(1, 0, 0));
+	glm::mat4 cube_trans = glm::translate(glm::mat4(1.f), glm::vec3(0, 1, 0));
+
+	glm::vec3 light_pos(10, 10, 10);
+	glm::vec3 light_color(300);
+	glm::mat4 light_trans = glm::translate(glm::mat4(1), light_pos);
+
+	float aspect = float(SHADOW_WIDTH) / float(SHADOW_HEIGHT);
+	float near = 1.f;
+	float far = 50.f;
+	glm::mat4 projection = glm::perspective(glm::radians(90.0f), aspect, near, far);
+	std::vector<glm::mat4> shadow_transforms = {
+		projection * glm::lookAt(light_pos, light_pos + glm::vec3(+1, 0, 0), glm::vec3(0.0, -1.0,  0.0)),
+		projection * glm::lookAt(light_pos, light_pos + glm::vec3(-1, 0, 0), glm::vec3(0.0, -1.0,  0.0)),
+		projection * glm::lookAt(light_pos, light_pos + glm::vec3(0, +1, 0), glm::vec3(0.0,  0.0,  1.0)),
+		projection * glm::lookAt(light_pos, light_pos + glm::vec3(0, -1, 0), glm::vec3(0.0,  0.0, -1.0)),
+		projection * glm::lookAt(light_pos, light_pos + glm::vec3(0, 0, +1), glm::vec3(0.0, -1.0,  0.0)),
+		projection * glm::lookAt(light_pos, light_pos + glm::vec3(0, 0, -1), glm::vec3(0.0, -1.0,  0.0)),
+	};
+
+	sample_depth_shader.use();
+	sample_depth_shader.set_uniform("far_plane", far);
+	sample_depth_shader.set_uniform("light_pos", light_pos);
+	for (int i = 0; i < 6; ++i) {
+		std::string var = std::format("light_space_matrix[{}]", i);
+		sample_depth_shader.set_uniform(var, shadow_transforms[i]);
+	}
+
+	shader.use();
+	glActiveTexture(GL_TEXTURE0);
+	shader.set_uniform("light_pos", light_pos);
+
+	bool is_shadow = true;
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glDepthFunc(GL_LEQUAL);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+
+		glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
+		{
+			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
+			glClear(GL_DEPTH_BUFFER_BIT);
+			sample_depth_shader.use();
+			sample_depth_shader.set_uniform("model", plane_trans_matrix);
+			plane_ptr->draw(sample_depth_shader);
+
+			sample_depth_shader.set_uniform("model", cube_trans);
+			cube_ptr->draw(sample_depth_shader);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		glViewport(0, 0, width, height);
+		glClear(GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT);
+
+		shader.use();
+		glActiveTexture(GL_TEXTURE1);
+		glBindTexture(GL_TEXTURE_CUBE_MAP, depth_cube_map);
+		shader.set_uniform("depth_cube_map", 1);
+		shader.set_uniform("far_plane", far);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, plane_diffuse_map);
+		shader.set_uniform("light_color", light_color);
+		shader.set_uniform("is_shadow", is_shadow);
+		shader.set_uniform("diffuse_map", 0);
+		shader.set_uniform("model", plane_trans_matrix);
+		shader.set_uniform("view", camera_ptr->get_view());
+		shader.set_uniform("projection", camera_ptr->get_projection());
+		shader.set_uniform("view_pos", camera_ptr->get_look_from());
+		plane_ptr->draw(shader);
+
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, cube_diffuse_map);
+		shader.set_uniform("diffuse_map", 0);
+		shader.set_uniform("model", cube_trans);
+		cube_ptr->draw(shader);
+
+		single_color_shader.use();
+		single_color_shader.set_uniform("light_color", light_color);
+		single_color_shader.set_uniform("model", light_trans);
+		single_color_shader.set_uniform("view", camera_ptr->get_view());
+		single_color_shader.set_uniform("projection", camera_ptr->get_projection());
+		cube_ptr->draw(single_color_shader);
+
+		ImGui::Begin("point shadow");
+		{
+			ImGui::Checkbox("is_shadow", &is_shadow);
+			ImGui::InputFloat3("light_color", glm::value_ptr(light_color));
+		}
+		ImGui::End();
+		swap_buffer();
+	}
+
+	glDeleteTextures(1, &depth_cube_map);
+	glDeleteRenderbuffers(1, &depth_rbo);
+	glDeleteFramebuffers(1, &depth_fbo);
 }

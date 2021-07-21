@@ -33,6 +33,7 @@ int main(void) {
 	//house();
 	//explode();
 	//instantiation();
-	planet();
+	//planet();
+	point_shadow();
 	destroy();
 }

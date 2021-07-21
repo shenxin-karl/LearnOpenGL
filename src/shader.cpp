@@ -24,6 +24,7 @@ Shader::Shader(const std::string &vertex_path, const std::string &fragment_path,
 	if (!success) {
 		glGetShaderInfoLog(vertex_shader, sizeof(errmsg), nullptr, errmsg);
 		std::cerr << "Compile vertex shader error:" << errmsg << std::endl;
+		assert(false);
 		return;
 	}
 
@@ -39,6 +40,7 @@ Shader::Shader(const std::string &vertex_path, const std::string &fragment_path,
 	if (!success) {
 		glGetShaderInfoLog(fragment_shader, sizeof(errmsg), nullptr, errmsg);
 		std::cerr << "Compile fragment shader error:" << errmsg << std::endl;
+		assert(false);
 		return;
 	}
 
@@ -56,6 +58,7 @@ Shader::Shader(const std::string &vertex_path, const std::string &fragment_path,
 		if (!success) {
 			glGetShaderInfoLog(house, sizeof(errmsg), nullptr, errmsg);
 			std::cerr << "Compile geometry shader error:" << errmsg << std::endl;
+			assert(false);
 			return;
 		}
 		glAttachShader(shader_program, house);
@@ -66,6 +69,7 @@ Shader::Shader(const std::string &vertex_path, const std::string &fragment_path,
 	if (!success) {
 		glGetProgramInfoLog(shader_program, sizeof(errmsg), nullptr, errmsg);
 		std::cerr << "Link program error:" << errmsg << std::endl;
+		assert(false);
 		return;
 	}
 
