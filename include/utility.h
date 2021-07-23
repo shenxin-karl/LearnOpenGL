@@ -12,17 +12,17 @@ T mix(const T &lhs, const T &rhs, float t) {
 	return lhs + static_cast<T>(t * (rhs - lhs));
 }
 
-void blinn_phong();
-void normal_mapping();
-void parallax_mapping();
-void shadow_mapping();
-void bloom();
-void pbr();
-void to_cube_map_test();
-void AK47();
-void house();
-void explode();
-void instantiation();
-void planet();
-void point_shadow();
-void deferred_shading();
+void blinn_phong(GLFWwindow *window);
+void normal_mapping(GLFWwindow *window);
+void parallax_mapping(GLFWwindow *window);
+void shadow_mapping(GLFWwindow *window);
+void bloom(GLFWwindow *window);
+void pbr(GLFWwindow *window);
+void to_cube_map_test(GLFWwindow *window);
+void AK47(GLFWwindow *window);
+void house(GLFWwindow *window);
+void explode(GLFWwindow *window);
+void instantiation(GLFWwindow *window);
+void planet(GLFWwindow *window);
+void point_shadow(GLFWwindow *window);
+void deferred_shading(GLFWwindow *window);

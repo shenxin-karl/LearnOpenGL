@@ -11,6 +11,8 @@ uniform sampler2D diffuse_map1;
 uniform sampler2D depth_map;
 uniform vec3 eye_pos;
 uniform vec3 light_dir;
+uniform int  pcf_kernel_size;
+uniform bool is_shadow;
 
 out vec4 frag_color;
 
@@ -20,7 +22,7 @@ float shadow_mapping(vec4 light_space_position, vec3 normal) {
 	if (ndc.z > 1) 
 		return 0;
 
-	const int limit = 1;
+	int limit = pcf_kernel_size;
 	float bias = mix(0.01, 0.005, max(dot(normal, light_dir), 0));
 	float curr_depth = ndc.z - bias;
 	float shadow = 0.0;
@@ -32,7 +34,9 @@ float shadow_mapping(vec4 light_space_position, vec3 normal) {
 			shadow += curr_depth <= pcf_depth ? 1 : 0;
 		}
 	}
-	shadow /= (limit * 9);
+
+	float size = limit * 2 + 1;
+	shadow /= (size * size);
 	return shadow;
 }
 
@@ -40,21 +44,21 @@ void main() {
 	vec3 normal = normalize(fs_in.normal);
 	vec3 view_dir = normalize(eye_pos - fs_in.position);
 	vec3 diffuse_color = texture(diffuse_map1, fs_in.texcoord).rgb;
-	float shadow = shadow_mapping(fs_in.light_space_position, normal);
+	float shadow = is_shadow ? shadow_mapping(fs_in.light_space_position, normal) : 1.0;
 
 	// ambient
 	vec3 ambinet = diffuse_color * 0.2;
 
 	// diffuse
 	float diff = max(dot(light_dir, normal), 0.0);
-	vec3 diffuse = (diff * 0.6 * shadow) * diffuse_color;
+	vec3 diffuse = (diff * 0.6) * diffuse_color;
 
 	vec3 half_vec = normalize(view_dir + light_dir);
 	float spec = pow(max(dot(half_vec, normal), 0.0), 64.0);
-	vec3 specular = (spec * 0.2 * shadow) * diffuse_color;
+	vec3 specular = (spec * 0.2) * diffuse_color;
 
 	const float gamma = 2.2;
-	vec3 color = ambinet + diffuse + specular;
+	vec3 color = ambinet + (diffuse + specular) * shadow;
 	color = pow(color, vec3(1 / gamma));
 	frag_color = vec4(color, 1.0);
 }

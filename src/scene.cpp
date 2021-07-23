@@ -4,30 +4,10 @@ Scene::Scene(GLFWwindow *_window, std::shared_ptr<Camera> _camera_ptr, int _widh
 : window(_window), camera_ptr(_camera_ptr), width(_widht), height(_hegith), near(_near), far(_far)
 {
 	scene_mapping.insert(std::make_pair(window, this));
-	// Setup Dear ImGui context
-	IMGUI_CHECKVERSION();
-	ImGui::CreateContext();
-	ImGuiIO &io = ImGui::GetIO(); (void)io;
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
-
-	// Setup Dear ImGui style
-	ImGui::StyleColorsDark();
-	//ImGui::StyleColorsClassic();
-
-	// Setup Platform/Renderer backends
-	const char *glsl_version = "#version 130";
-	ImGui_ImplGlfw_InitForOpenGL(window, true);
-	ImGui_ImplOpenGL3_Init(glsl_version);
 }
 
 Scene::~Scene() {
 	scene_mapping.erase(window);
-
-	// imgui Cleanup
-	ImGui_ImplOpenGL3_Shutdown();
-	ImGui_ImplGlfw_Shutdown();
-	ImGui::DestroyContext();
 }
 
 void Scene::process_key_callback(int key, int scancode, int action, int mode) {
@@ -56,6 +36,11 @@ void Scene::process_scroll_callback(double xoffset, double yoffset) {
 }
 
 void Scene::process_framebuffer_size_callback(int width, int height) {
+	if (width == 0 || height == 0) {
+		glfwSetWindowShouldClose(window, GLFW_TRUE);
+		return;
+	}
+
 	this->width = width;
 	this->height = height;
 	camera_ptr->framebuff_callback(width, height);
@@ -73,8 +58,8 @@ void Scene::scene_widgets() {
 	ImGui::Begin("scene");
 	{
 		ImGui::Checkbox("camera", &show_camera_widgets_);
-		for (int i = 0; i < models_.size(); ++i)
-			ImGui::Checkbox(models_[i]->get_name().c_str(), reinterpret_cast<bool *>(&model_flags_[i]));
+		//for (int i = 0; i < models_.size(); ++i)
+		//	ImGui::Checkbox(models_[i]->get_name().c_str(), reinterpret_cast<bool *>(&model_flags_[i]));
 	}
 	ImGui::End();
 
@@ -174,6 +159,7 @@ void Scene::blinn_phong() {
 		glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		blinn_phong_shader.use();
+		blinn_phong_shader.set_uniform("model", glm::mat4(1));
 		blinn_phong_shader.set_uniform("view", camera_ptr->get_view());
 		blinn_phong_shader.set_uniform("projection", camera_ptr->get_projection());
 		blinn_phong_shader.set_uniform("light_dir", light_dir);
@@ -209,7 +195,7 @@ void Scene::normal_mapping() {
 		return;
 	}
 
-	glm::vec3 light_dir = glm::normalize(glm::vec3(0.5f, 0.5f, 0.f));
+	glm::vec3 light_dir = glm::normalize(glm::vec3(0.f, -1.f, -0.5f));
 	normal_mapping_shader.use();
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, diffuse_map);
@@ -233,7 +219,7 @@ void Scene::normal_mapping() {
 
 		glm::mat4 light_rotate = glm::rotate(glm::mat4(1.f), float(glm::radians(glfwGetTime() * 5.f)), glm::vec3(0, 1, 0));
 		glm::vec3 new_light_dir = light_rotate * glm::vec4(light_dir, 1.f);
-		normal_mapping_shader.set_uniform("light_dir", new_light_dir);
+		normal_mapping_shader.set_uniform("light_dir", light_dir);
 		plane_ptr->draw(normal_mapping_shader);
 
 		ImGui::Begin("normal mapping");
@@ -268,7 +254,7 @@ void Scene::parallax_mapping() {
 	glActiveTexture(GL_TEXTURE2);
 	glBindTexture(GL_TEXTURE_2D, displacement_map);
 	parallax_mapping_shader.set_uniform("displacement_map1", 2);
-	parallax_mapping_shader.set_uniform("displacement_scale", 0.1f);
+	float displacement_scale = 0.1f;
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_MULTISAMPLE);
@@ -282,13 +268,19 @@ void Scene::parallax_mapping() {
 		parallax_mapping_shader.set_uniform("view", camera_ptr->get_view());
 		parallax_mapping_shader.set_uniform("projection", camera_ptr->get_projection());
 		parallax_mapping_shader.set_uniform("eye_pos", camera_ptr->get_look_from());
+		parallax_mapping_shader.set_uniform("displacement_scale", displacement_scale);
 
 		glm::mat4 light_rotate = glm::rotate(glm::mat4(1.f), float(glm::radians(glfwGetTime() * 5.f)), glm::vec3(0, 1, 0));
 		glm::vec3 new_light_dir = light_rotate * glm::vec4(light_dir, 1.f);
 		parallax_mapping_shader.set_uniform("light_dir", new_light_dir);
 		plane_ptr->draw(parallax_mapping_shader);
-		CheckError();
-		//glfwSwapBuffers(window);
+
+		ImGui::Begin("parallax_mapping param");
+		{
+			ImGui::DragFloat("displacement_scale", &displacement_scale, 0.01f, 0.f, 0.3f);
+		}
+		ImGui::End();
+
 		swap_buffer();
 	}
 }
@@ -346,6 +338,9 @@ void Scene::shadow_mapping() {
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	int pcf_kernel_size = 1;
+	bool is_shadow = true;
+
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);	
 	while (!glfwWindowShouldClose(window)) {
@@ -365,7 +360,6 @@ void Scene::shadow_mapping() {
 		// 渲染深度贴图
 		glBindFramebuffer(GL_FRAMEBUFFER, depth_fbo);
 		{
-
 			glCullFace(GL_FRONT);		// 渲染场景深度贴图使用正面剔除, 避免悬浮问题出现
 			glViewport(0, 0, SHADOW_WIDTH, SHADOW_HEIGHT);
 			glClear(GL_DEPTH_BUFFER_BIT);
@@ -399,6 +393,8 @@ void Scene::shadow_mapping() {
 		shadow_mapping_shader.set_uniform("view", camera_ptr->get_view());
 		shadow_mapping_shader.set_uniform("projection", camera_ptr->get_projection());
 		shadow_mapping_shader.set_uniform("light_dir", light_dir);
+		shadow_mapping_shader.set_uniform("pcf_kernel_size", pcf_kernel_size);
+		shadow_mapping_shader.set_uniform("is_shadow", is_shadow);
 
 		shadow_mapping_shader.set_uniform("model", plane_trans_matrix);
 		plane_ptr->draw(shadow_mapping_shader);
@@ -409,7 +405,14 @@ void Scene::shadow_mapping() {
 		shadow_mapping_shader.set_uniform("diffuse_map1", 0);
 		cube_ptr->draw(shadow_mapping_shader);
 
-		glfwSwapBuffers(window);
+		ImGui::Begin("shadow_mapping param");
+		{
+			ImGui::DragInt("pcf size", &pcf_kernel_size, 1, 1, 5);
+			ImGui::Checkbox("shadow", &is_shadow);
+		}
+		ImGui::End();
+
+		swap_buffer();
 	}
 
 	glDeleteFramebuffers(1, &depth_fbo);
@@ -628,7 +631,7 @@ void Scene::pbr() {
 	GLuint brdf_lut = Loader::brdf_lut(hdr_cube_map);
 	auto sphere_ptr = Loader::create_sphere();
 	auto skybox_cube_ptr = Loader::create_skybox();
-	add_model(sphere_ptr);
+	//add_model(sphere_ptr);
 
 	Shader pbr_shader("shader/pbr/pbr.vert", "shader/pbr/pbr.frag");
 	if (!pbr_shader) {
@@ -664,6 +667,7 @@ void Scene::pbr() {
 	int nrColumns = 7;
 	float spacing = 2.5;
 	glEnable(GL_DEPTH_TEST);
+	glDisable(GL_CULL_FACE);
 	glDepthFunc(GL_LEQUAL);
 	while (!glfwWindowShouldClose(window)) {
 		poll_event();
@@ -672,6 +676,7 @@ void Scene::pbr() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		pbr_shader.use();
+		pbr_shader.set_uniform("model", glm::mat4(1));
 		pbr_shader.set_uniform("view_pos", camera_ptr->get_look_from());
 		pbr_shader.set_uniform("view", camera_ptr->get_view());
 		pbr_shader.set_uniform("projection", camera_ptr->get_projection());
@@ -1063,7 +1068,7 @@ void Scene::planet() {
 		return;
 	}
 
-	unsigned int amout = 50000;
+	unsigned int amout = 5000;
 	std::vector<glm::mat4> model_matrices;
 	model_matrices.reserve(amout);
 	std::random_device rd;
@@ -1076,7 +1081,7 @@ void Scene::planet() {
 		float angle = float(i) / float(amout) * 360.f;
 		float displacement = mix(-offset, offset, dis(gen));
 		float x = std::sin(angle) * radius + displacement;
-		float y = displacement * 0.4f;
+		float y = displacement * mix(-2.f, 2.f, dis(gen));
 		displacement = mix(-offset, offset, dis(gen));
 		float z = std::cos(angle) * radius + displacement;
 		glm::mat4 model = glm::translate(glm::mat4(1.f), glm::vec3(x, y, z));

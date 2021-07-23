@@ -16,6 +16,10 @@ void init() {
 
 void destroy() {
 	Loader::destroy();
+	// imgui Cleanup
+	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplGlfw_Shutdown();
+	ImGui::DestroyContext();
 	glfwTerminate();
 }
 
@@ -23,19 +27,63 @@ void destroy() {
 int main(void) {
 	init();
 
-	//blinn_phong();
-	//normal_mapping();
-	//parallax_mapping();
-	//shadow_mapping();
-	//bloom();
-	//pbr();
-	//to_cube_map_test();
-	//AK47();
-	//house();
-	//explode();
-	//instantiation();
-	//planet();
-	//point_shadow();
-	deferred_shading();
+	GLFWwindow *window = create_window(1200, 800, static_cast<std::string>(project_name));
+	// Setup Dear ImGui context
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO &io = ImGui::GetIO(); (void)io;
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	//io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+
+	// Setup Dear ImGui style
+	ImGui::StyleColorsDark();
+	//ImGui::StyleColorsClassic();
+
+	// Setup Platform/Renderer backends
+	const char *glsl_version = "#version 130";
+	ImGui_ImplGlfw_InitForOpenGL(window, true);
+	ImGui_ImplOpenGL3_Init(glsl_version);
+
+	std::function<void(GLFWwindow *window)> callback;
+	while (!glfwWindowShouldClose(window)) {
+		glfwPollEvents();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplGlfw_NewFrame();
+		ImGui::NewFrame();
+
+		ImGui::Begin("select demo");
+		{
+			if (ImGui::Button("blinn-phong"))
+				callback = blinn_phong;
+			if (ImGui::Button("normal_mapping"))
+				callback = normal_mapping;
+			if (ImGui::Button("parallax_mapping"))
+				callback = parallax_mapping;
+			if (ImGui::Button("shadow_mapping"))
+				callback = shadow_mapping;
+			if (ImGui::Button("point_shadow"))
+				callback = point_shadow;
+			if (ImGui::Button("pbr"))
+				callback = pbr;
+			if (ImGui::Button("AK47"))
+				callback = AK47;
+			if (ImGui::Button("planet"))
+				callback = planet;
+			if (ImGui::Button("deferred_shading"))
+				callback = deferred_shading;
+		}
+		ImGui::End();
+
+		ImGui::Render();
+		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+		glfwSwapBuffers(window);
+
+		if (callback != nullptr) {
+			callback(window);
+			break;
+		}
+	}
 	destroy();
 }

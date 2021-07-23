@@ -61,44 +61,47 @@ constexpr float g_far = 1000.f;
 constexpr float g_fov = 45.f;
 
 
-void blinn_phong() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
-	glm::vec3 look_from(-200, 0, 0);
+void blinn_phong(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(45.f, 100.f, 200.f);
 	glm::vec3 look_up(0, 1, 0);
 	glm::vec3 look_at(0, 0, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 50.f);
 	camera_ptr->set_aspect(g_aspect);
+	camera_ptr->init_euler_angle(-10.f, -100.f);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
 	scene.blinn_phong();
 	glfwDestroyWindow(window);
 }
 
-void normal_mapping() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
-	glm::vec3 look_from(-5, 0, 0);
+void normal_mapping(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(0.22f, 2.f, 2.3f);
 	glm::vec3 look_up(0, 1, 0);
 	glm::vec3 look_at(0, 0, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
 	camera_ptr->set_aspect(g_aspect);
+	camera_ptr->init_euler_angle(-40.f, -90.f);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
 	scene.normal_mapping();
 	glfwDestroyWindow(window);
 }
 
-void parallax_mapping() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
-	glm::vec3 look_from(-5, 0, 0);
+void parallax_mapping(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(0.012f, 2.8f, 0.45f);
 	glm::vec3 look_up(0, 1, 0);
 	glm::vec3 look_at(0, 0, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
 	camera_ptr->set_aspect(g_aspect);
+	camera_ptr->init_euler_angle(-83.f, -90.f);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
 	scene.parallax_mapping();
 	glfwDestroyWindow(window);
 }
 
-void shadow_mapping() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void shadow_mapping(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-5.f, 2.f, 0);
 	glm::vec3 look_up(0, 1, 0);
 	glm::vec3 look_at(0, -10, 0);
@@ -109,8 +112,8 @@ void shadow_mapping() {
 	glfwDestroyWindow(window);
 }
 
-void bloom() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void bloom(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-5.f, 2.f, 0);
 	glm::vec3 look_up(0, 1, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
@@ -120,9 +123,9 @@ void bloom() {
 	glfwDestroyWindow(window);
 }
 
-void pbr() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
-	glm::vec3 look_from(-0.5, -2.f, 30);
+void pbr(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(0.8f, -0.1f, 4.f);
 	glm::vec3 look_up(0, 1, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
 	camera_ptr->set_aspect(g_aspect);
@@ -132,8 +135,8 @@ void pbr() {
 	glfwDestroyWindow(window);
 }
 
-void to_cube_map_test() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void to_cube_map_test(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-0.5, -2.f, 30);
 	glm::vec3 look_up(0, 1, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
@@ -144,20 +147,20 @@ void to_cube_map_test() {
 	glfwDestroyWindow(window);
 }
 
-void AK47() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
-	glm::vec3 look_from(-10, -10, 95);
+void AK47(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(-15.f, 32.f, 45.f);
 	glm::vec3 look_up(0, 1, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 30.f);
-	camera_ptr->init_euler_angle(10.5f, -85.f);
+	camera_ptr->init_euler_angle(-5.f, -71.f);
 	camera_ptr->set_aspect(g_aspect);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
 	scene.AK47();
 	glfwDestroyWindow(window);
 }
 
-void house() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void house(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-0.5, -2.f, 30);
 	glm::vec3 look_up(0, 1, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
@@ -168,8 +171,8 @@ void house() {
 	glfwDestroyWindow(window);
 }
 
-void explode() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void explode(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-200, 0, 0);
 	glm::vec3 look_up(0, 1, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 50.f);
@@ -179,8 +182,8 @@ void explode() {
 	glfwDestroyWindow(window);
 }
 
-void instantiation() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void instantiation(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-0.5, -2.f, 30);
 	glm::vec3 look_up(0, 1, 0);
 	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
@@ -190,11 +193,11 @@ void instantiation() {
 	glfwDestroyWindow(window);
 }
 
-void planet() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void planet(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-135.f, 26.f, -6.f);
 	glm::vec3 look_up(0, 1, 0);
-	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
+	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 20.f);
 	camera_ptr->set_aspect(g_aspect);
 	camera_ptr->init_euler_angle(-21.f, 0.f);
 	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
@@ -202,8 +205,8 @@ void planet() {
 	glfwDestroyWindow(window);
 }
 
-void point_shadow() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void point_shadow(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(-5.f, 2.f, 0);
 	glm::vec3 look_up(0, 1, 0);
 	glm::vec3 look_at(0, -10, 0);
@@ -214,8 +217,8 @@ void point_shadow() {
 	glfwDestroyWindow(window);
 }
 
-void deferred_shading() {
-	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+void deferred_shading(GLFWwindow *window) {
+	//GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
 	glm::vec3 look_from(150.f, 120.f, 850.f);
 	glm::vec3 look_up(0, 1, 0);
 	glm::vec3 look_at(0, -10, 0);

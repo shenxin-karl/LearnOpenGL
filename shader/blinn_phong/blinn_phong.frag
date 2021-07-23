@@ -4,7 +4,6 @@ in VS_OUT {
 	vec3	position;
 	vec2	texcoord;
 	vec3	normal;
-	vec3	color;
 } fs_in;
 
 struct Light {
