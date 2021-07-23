@@ -9,7 +9,7 @@ GLFWwindow *create_window(int width, int height, const std::string &title);
 
 template<typename T> requires requires{ std::declval<T>() + (std::declval<T>() - std::declval<T>()) * 1.f; }
 T mix(const T &lhs, const T &rhs, float t) {
-	return lhs + t * (rhs - lhs);
+	return lhs + static_cast<T>(t * (rhs - lhs));
 }
 
 void blinn_phong();
@@ -25,3 +25,4 @@ void explode();
 void instantiation();
 void planet();
 void point_shadow();
+void deferred_shading();

@@ -1287,3 +1287,166 @@ void Scene::point_shadow() {
 	glDeleteRenderbuffers(1, &depth_rbo);
 	glDeleteFramebuffers(1, &depth_fbo);
 }
+
+void Scene::deferred_shading() {
+	auto alod_ptr = Loader::load_model("resources/alod/dino obj.obj");
+	auto cube_ptr = Loader::create_trest_cube();
+	auto quad_ptr = Loader::create_quad();
+	GLuint alod_diffuse_map = Loader::load_texture2ds("resources/alod/dino.jpg");
+	Shader gbuffer_shader("shader/gbuffer/gbuffer.vert", "shader/gbuffer/gbuffer.frag");
+	Shader deferred_shader("shader/gbuffer/deferred_shading.vert", "shader/gbuffer/deferred_shading.frag");
+	Shader single_color_shader("shader/bloom/single_color.vert", "shader/bloom/single_color.frag");
+
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<float> dis(0, 1);
+
+	constexpr int alod_row = 5;
+	constexpr int alod_col = 5;
+	constexpr int alod_interval = 100;
+	std::vector<glm::vec3> alod_transforms;
+	alod_transforms.reserve(alod_row * alod_col);
+	for (int i = 0; i < alod_row; ++i) {
+		for (int j = 0; j < alod_col; ++j) {
+			int x = i * alod_interval;
+			int y = 0;
+			int z = j * alod_interval;
+			alod_transforms.emplace_back(x, y, z);
+		}
+	}
+
+	glm::mat4 light_scale = glm::scale(glm::mat4(1), glm::vec3(5));
+	constexpr int light_size = 32;
+	std::vector<glm::vec3> light_transforms;
+	std::vector<glm::vec3> light_colors;
+	light_transforms.reserve(light_size);
+	light_colors.reserve(light_size);
+	for (int i = 0; i < light_size; ++i) {
+		float xpos = mix(0.f, 500.f, dis(gen));
+		float ypos = mix(90.f, 150.f, dis(gen));
+		float zpos = mix(0.f, 500.f, dis(gen));
+		light_transforms.emplace_back(xpos, ypos, zpos);
+		float r = mix(0.5f, 1.0f, dis(gen));
+		float g = mix(0.5f, 1.0f, dis(gen));
+		float b = mix(0.5f, 1.0f, dis(gen));
+		light_colors.emplace_back(r, g, b);
+	}
+
+	// 设置光源 uniform
+	deferred_shader.use();
+	for (int i = 0; i < light_size; ++i) {
+		std::string pos_var = std::format("lights[{}].position", i);
+		std::string col_var = std::format("lights[{}].color", i);
+		deferred_shader.set_uniform(pos_var, light_transforms[i]);
+		deferred_shader.set_uniform(col_var, light_colors[i]);
+	}
+	
+	GLuint gbuffer;
+	GLuint gbuffer_rbo;
+	GLuint position_buffer;
+	GLuint normal_buffer;
+	GLuint color_buffer;
+	glGenFramebuffers(1, &gbuffer);
+	glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+	{
+		// 位置纹理
+		glGenTextures(1, &position_buffer);
+		glBindTexture(GL_TEXTURE_2D, position_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, position_buffer, 0);
+
+		// 法线纹理
+		glGenTextures(1, &normal_buffer);
+		glBindTexture(GL_TEXTURE_2D, normal_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normal_buffer, 0);
+
+		// 颜色纹理
+		glGenTextures(1, &color_buffer);
+		glBindTexture(GL_TEXTURE_2D, color_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, color_buffer, 0);
+
+		glGenRenderbuffers(1, &gbuffer_rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuffer_rbo);
+
+		GLuint attachment[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+		glDrawBuffers(3, attachment);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	glDepthFunc(GL_LEQUAL);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glBindFramebuffer(GL_FRAMEBUFFER, gbuffer);
+		{
+			glViewport(0, 0, width, height);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			gbuffer_shader.use();
+			gbuffer_shader.set_uniform("view", camera_ptr->get_view());
+			gbuffer_shader.set_uniform("projection", camera_ptr->get_projection());
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, alod_diffuse_map);
+			gbuffer_shader.set_uniform("diffuse_map", 0);
+			for (int i = 0; i < alod_transforms.size(); ++i) {
+				glm::mat4 model = glm::translate(glm::mat4(1.0f), alod_transforms[i]);
+				gbuffer_shader.set_uniform("model", model);
+				alod_ptr->draw(gbuffer_shader);
+			}
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, width, height);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		// 绑定 G-Buffer 纹理
+		{
+			deferred_shader.use();
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, position_buffer);
+			deferred_shader.set_uniform("position_buffer", 0);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, normal_buffer);
+			deferred_shader.set_uniform("normal_buffer", 1);
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, color_buffer);
+			deferred_shader.set_uniform("albedo_buffer", 2);
+		}
+		quad_ptr->draw(deferred_shader);
+
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+		// 绘制光源
+		single_color_shader.use();
+		single_color_shader.set_uniform("view", camera_ptr->get_view());
+		single_color_shader.set_uniform("projection", camera_ptr->get_projection());
+		for (int i = 0; i < light_size; ++i) {
+			glm::mat4 model = glm::translate(glm::mat4(1), light_transforms[i]);
+			model = glm::scale(model, glm::vec3(10));
+			single_color_shader.set_uniform("model", model);
+			single_color_shader.set_uniform("light_color", light_colors[i]);
+			cube_ptr->draw(single_color_shader);
+		}
+
+		swap_buffer();
+	}
+
+	glDeleteTextures(1, &color_buffer);
+	glDeleteTextures(1, &normal_buffer);
+	glDeleteTextures(1, &position_buffer);
+	glDeleteRenderbuffers(1, &gbuffer_rbo);
+	glDeleteFramebuffers(1, &gbuffer);
+}
+
+

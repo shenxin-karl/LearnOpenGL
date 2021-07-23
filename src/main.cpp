@@ -19,6 +19,7 @@ void destroy() {
 	glfwTerminate();
 }
 
+
 int main(void) {
 	init();
 
@@ -34,6 +35,7 @@ int main(void) {
 	//explode();
 	//instantiation();
 	//planet();
-	point_shadow();
+	//point_shadow();
+	deferred_shading();
 	destroy();
 }

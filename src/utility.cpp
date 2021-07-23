@@ -213,3 +213,16 @@ void point_shadow() {
 	scene.point_shadow();
 	glfwDestroyWindow(window);
 }
+
+void deferred_shading() {
+	GLFWwindow *window = create_window(g_width, g_height, static_cast<std::string>(project_name));
+	glm::vec3 look_from(150.f, 120.f, 850.f);
+	glm::vec3 look_up(0, 1, 0);
+	glm::vec3 look_at(0, -10, 0);
+	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, 3000.f, 0.1f, 100.f);
+	camera_ptr->set_aspect(g_aspect);
+	camera_ptr->init_euler_angle(-10.f, -90.f);
+	Scene scene(window, camera_ptr, g_width, g_height, g_near, 3000.f);
+	scene.deferred_shading();
+	glfwDestroyWindow(window);
+}

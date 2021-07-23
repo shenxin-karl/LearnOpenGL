@@ -52,4 +52,5 @@ public:
 	void instantiation();
 	void planet();
 	void point_shadow();
+	void deferred_shading();
 };
