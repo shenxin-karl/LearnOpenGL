@@ -3,13 +3,13 @@
 这是学习 OpenGL 时, 编写的例子.
 
 1. **blinn-phong 着色模型**
-   <img src="readme_resource/blinn-phong.png" alt="blinn-phong" style="zoom:50%;" />
+   <img src="readme_resource/blinn-phong.png" alt="blinn-phong" style="zoom:67%;" />
 
- 2. **normal mapping 切线空间的法线贴图**
-      <img src="readme_resource/normal_mapping.png" alt="image-20210723123339056" style="zoom:50%;" />
+2. **normal mapping 切线空间的法线贴图**
+   <img src="readme_resource/normal_mapping.png" alt="image-20210723123339056" style="zoom:67%;" />
 
 3. **parallax mapping 视差贴图**
-   <img src="readme_resource/parallax_mapping.png" alt="image-20210723123434859" style="zoom:50%;" />
+   <img src="readme_resource/parallax_mapping.png" alt="image-20210723123434859" style="zoom:67%;" />
 
 4. **shadow mapping 定向光阴影映射**
    <img src="readme_resource/shadow_mapping.png" alt="image-20210723123544220" style="zoom: 67%;" />
@@ -45,5 +45,5 @@
 
 每个 `demo` 都可 `scene` 和 `camera` 窗口. `w, s, a, d` 可以移动. 启动 `mouse` 可以使用鼠标变换视角.  也可以通过 拖动 `pitch` 和 `yaw` 的值. 来修改观察方向
 
-<img src="readme_resource/camera.png" alt="image-20210723125427357" style="zoom: 80%;" />
+<img src="readme_resource/camera.png" alt="image-20210723125427357" style="zoom: 67%;" />
 
