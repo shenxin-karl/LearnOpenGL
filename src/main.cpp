@@ -73,6 +73,8 @@ int main(void) {
 				callback = planet;
 			if (ImGui::Button("deferred_shading"))
 				callback = deferred_shading;
+			if (ImGui::Button("SSAO"))
+				callback = SSAO;
 		}
 		ImGui::End();
 

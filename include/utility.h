@@ -26,3 +26,4 @@ void instantiation(GLFWwindow *window);
 void planet(GLFWwindow *window);
 void point_shadow(GLFWwindow *window);
 void deferred_shading(GLFWwindow *window);
+void SSAO(GLFWwindow *window);

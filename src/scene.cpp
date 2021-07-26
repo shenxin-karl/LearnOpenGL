@@ -1388,6 +1388,14 @@ void Scene::deferred_shading() {
 	}
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	float light_kc = 1.0f;
+	float light_kl = 0.0014f;
+	float light_kq = 0.000007f;
+	deferred_shader.use();
+	deferred_shader.set_uniform("light_kc", light_kc);
+	deferred_shader.set_uniform("light_kl", light_kl);
+	deferred_shader.set_uniform("light_kq", light_kq);
+
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_CULL_FACE);
 	glDepthFunc(GL_LEQUAL);
@@ -1454,4 +1462,285 @@ void Scene::deferred_shading() {
 	glDeleteFramebuffers(1, &gbuffer);
 }
 
+void Scene::SSAO() {
+	auto marmoset_ptr = Loader::load_model("resources/marmoset/Statuette.obj");
+	auto marmoset_diffuse_map = Loader::load_texture2ds("resources/marmoset/textures/Statuette_sheep_diffuse.png");
+	auto marmoset_specular_map = Loader::load_texture2ds("resources/marmoset/textures/Statuette_sheep_specular.png");
+	auto marmoset_normal_map = Loader::load_texture2d("resources/marmoset/textures/Statuette_sheep_normal.png");
+	auto plane_diffuse_map = Loader::load_texture2ds("resources/test_plane/wood.png");
+	auto plane_ptr = Loader::create_test_plane();
+	auto quad_ptr = Loader::create_quad();
+	auto cube_ptr = Loader::create_trest_cube();
+	Shader gbuffer_shader("shader/SSAO/gbuffer.vert", "shader/SSAO/gbuffer.frag");
+	Shader gen_ssao_shader("shader/SSAO/generate_ssao.vert", "shader/SSAO/generate_ssao.frag");
+	Shader ssao_shader("shader/SSAO/ssao.vert", "shader/SSAO/ssao.frag");
+	Shader blur_shader("shader/SSAO/blur.vert", "shader/SSAO/blur.frag");
+	Shader single_color_shader("shader/bloom/single_color.vert", "shader/bloom/single_color.frag");
+
+	// 创建 gbuffer 纹理对象
+	GLuint gbuffer_fbo;
+	GLuint gbuffer_rbo;
+	GLuint position_buffer;
+	GLuint normal_buffer;
+	GLuint albedo_diff_buffer;
+	GLuint albedo_spec_buffer;
+	glGenFramebuffers(1, &gbuffer_fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_fbo);
+	{
+		// 位置纹理
+		glGenTextures(1, &position_buffer);
+		glBindTexture(GL_TEXTURE_2D, position_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, position_buffer, 0);
+
+		// 法线纹理
+		glGenTextures(1, &normal_buffer);
+		glBindTexture(GL_TEXTURE_2D, normal_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, normal_buffer, 0);
+
+		// 颜色纹理
+		glGenTextures(1, &albedo_diff_buffer);
+		glBindTexture(GL_TEXTURE_2D, albedo_diff_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, albedo_diff_buffer, 0);
+
+		// 颜色纹理
+		glGenTextures(1, &albedo_spec_buffer);
+		glBindTexture(GL_TEXTURE_2D, albedo_spec_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT3, GL_TEXTURE_2D, albedo_spec_buffer, 0);
+
+		glGenRenderbuffers(1, &gbuffer_rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuffer_rbo);
+
+		GLuint attachment[4] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3 };
+		glDrawBuffers(4, attachment);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glm::mat4 plane_scale = glm::scale(glm::mat4(1.f), glm::vec3(10.f, 1, 10.f));
+	glm::mat4 plane_trans_matrix = glm::rotate(plane_scale, glm::radians(90.f), glm::vec3(1, 0, 0));
+
+	// 生成 ssao 采样点
+	std::random_device rd;
+	std::mt19937 gen(rd());
+	std::uniform_real_distribution<float> dis(0, 1);
+	std::vector < glm::vec3> ssao_kernel;
+	for (int i = 0; i < 64; ++i) {
+		float x = dis(gen) * 2.0f - 1.0f;
+		float y = dis(gen) * 2.0f - 1.0f;
+		float z = dis(gen);
+		glm::vec3 sample = glm::normalize(glm::vec3(x, y, z));
+		sample *= dis(gen);
+		float scale = float(i) / 64.f;
+		scale = mix(0.1f, 1.0f, scale * scale);
+		sample *= scale;
+		ssao_kernel.push_back(sample);
+	}
+
+	// 生成 ssao 的采样噪声
+	std::vector<glm::vec3> ssao_noise;
+	for (int i = 0; i < 16; ++i) {
+		float x = dis(gen) * 2.0f - 1.0f;
+		float y = dis(gen) * 2.0f - 1.0f;
+		ssao_noise.emplace_back(x, y, 0.f);
+	}
+
+	// 噪声纹理
+	GLuint noise_texture;
+	glGenTextures(1, &noise_texture);
+	glBindTexture(GL_TEXTURE_2D, noise_texture);
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 4, 4, 0, GL_RGB, GL_FLOAT, ssao_noise.data());
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	// ssao fbo
+	GLuint ssao_fbo;
+	GLuint ssao_rbo;
+	GLuint ssao_texture;
+	glGenFramebuffers(1, &ssao_fbo);
+	glBindFramebuffer(GL_FRAMEBUFFER, ssao_fbo);
+	{
+		glGenTextures(1, &ssao_texture);
+		glBindTexture(GL_TEXTURE_2D, ssao_texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssao_texture, 0);
+
+		glGenRenderbuffers(1, &ssao_rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, ssao_rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, ssao_rbo);
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// 模糊的 ssao 纹理对象
+	GLuint blur_texture;
+	glGenTextures(1, &blur_texture);
+	glBindTexture(GL_TEXTURE_2D, blur_texture);
+	{
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RED, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	}
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	gbuffer_shader.use();
+	gbuffer_shader.set_uniform("NEAR", near);
+	gbuffer_shader.set_uniform("FAR", far);
+	float radius = 1.f;
+	gen_ssao_shader.use();
+	for (int i = 0; i < 64; ++i) {
+		std::string var = std::format("samples[{}]", i);
+		gen_ssao_shader.set_uniform(var, ssao_kernel[i]);
+	}
+
+	glm::vec3 light_position(15);
+	glm::vec3 light_color(300);
+	glm::mat4 cube_trans = glm::translate(glm::mat4(1), light_position);
+
+	int kernel_size = 64;
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_CULL_FACE);
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+
+		// 延迟渲染几何阶段
+		glBindFramebuffer(GL_FRAMEBUFFER, gbuffer_fbo);
+		{
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			gbuffer_shader.use();
+			gbuffer_shader.set_uniform("is_plane", false);
+			gbuffer_shader.set_uniform("model", glm::mat4(1));
+			gbuffer_shader.set_uniform("view", camera_ptr->get_view());
+			gbuffer_shader.set_uniform("projection", camera_ptr->get_projection());
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, marmoset_normal_map);
+			gbuffer_shader.set_uniform("normal_map", 0);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, marmoset_diffuse_map);
+			gbuffer_shader.set_uniform("diffuse_map", 1);
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, marmoset_specular_map);
+			gbuffer_shader.set_uniform("specular_map", 2);
+			marmoset_ptr->draw(gbuffer_shader);
+
+			gbuffer_shader.set_uniform("is_plane", true);
+			gbuffer_shader.set_uniform("model", plane_trans_matrix);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, plane_diffuse_map);
+			gbuffer_shader.set_uniform("diffuse_map", 0);
+			plane_ptr->draw(gbuffer_shader);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		// 生成 ssao 纹理
+		glBindFramebuffer(GL_FRAMEBUFFER, ssao_fbo);
+		{
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ssao_texture, 0);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			gen_ssao_shader.use();
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, position_buffer);
+			gen_ssao_shader.set_uniform("position_buffer", 0);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, normal_buffer);
+			gen_ssao_shader.set_uniform("normal_buffer", 1);
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, noise_texture);
+			gen_ssao_shader.set_uniform("noise_texture", 2);
+			gen_ssao_shader.set_uniform("radius", radius);
+			gen_ssao_shader.set_uniform("projection", camera_ptr->get_projection());
+			gen_ssao_shader.set_uniform("kernel_size", kernel_size);
+			quad_ptr->draw(gen_ssao_shader);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		// 模糊 ssao
+		glBindFramebuffer(GL_FRAMEBUFFER, ssao_fbo);
+		{
+			glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, blur_texture, 0);
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			blur_shader.use();
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, ssao_texture);
+			blur_shader.set_uniform("ssao_texture", 0);
+			quad_ptr->draw(blur_shader);
+		}
+		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+		glm::vec3 view_light_pos = glm::vec3(camera_ptr->get_view() * glm::vec4(light_position, 1.0));
+		// 颜色渲染光照阶段
+		{
+			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+			ssao_shader.use();
+			ssao_shader.set_uniform("light_position", view_light_pos);
+			ssao_shader.set_uniform("light_color", light_color);
+			glActiveTexture(GL_TEXTURE0);
+			glBindTexture(GL_TEXTURE_2D, position_buffer);
+			ssao_shader.set_uniform("position_buffer", 0);
+			glActiveTexture(GL_TEXTURE1);
+			glBindTexture(GL_TEXTURE_2D, normal_buffer);
+			ssao_shader.set_uniform("normal_buffer", 1);
+			glActiveTexture(GL_TEXTURE2);
+			glBindTexture(GL_TEXTURE_2D, albedo_diff_buffer);
+			ssao_shader.set_uniform("albedo_diff_buffer", 2);
+			glActiveTexture(GL_TEXTURE3);
+			glBindTexture(GL_TEXTURE_2D, albedo_spec_buffer);
+			ssao_shader.set_uniform("albedo_spec_buffer", 3);
+			glActiveTexture(GL_TEXTURE4);
+			glBindTexture(GL_TEXTURE_2D, blur_texture);
+			ssao_shader.set_uniform("ssao_texture", 4);
+			quad_ptr->draw(ssao_shader);
+		}
+
+		// 拷贝 gbuffer_fbo 深度到默认的帧缓冲
+		glBindFramebuffer(GL_READ_FRAMEBUFFER, gbuffer_fbo);
+		glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+		glBlitFramebuffer(0, 0, width, height, 0, 0, width, height, GL_DEPTH_BUFFER_BIT, GL_NEAREST);
+
+		// 绘制光源
+		{
+			single_color_shader.use();
+			single_color_shader.set_uniform("model", cube_trans);
+			single_color_shader.set_uniform("view", camera_ptr->get_view());
+			single_color_shader.set_uniform("projection", camera_ptr->get_projection());
+			single_color_shader.set_uniform("light_color", light_color);
+			cube_ptr->draw(single_color_shader);
+		}
+
+		swap_buffer();
+	}
+
+	glDeleteTextures(1, &noise_texture);
+	glDeleteTextures(1, &blur_texture);
+	glDeleteFramebuffers(1, &ssao_rbo);
+	glDeleteFramebuffers(1, &ssao_fbo);
+
+	glDeleteTextures(1, &noise_texture);
+	glDeleteTextures(1, &albedo_spec_buffer);
+	glDeleteTextures(1, &albedo_diff_buffer);
+	glDeleteTextures(1, &normal_buffer);
+	glDeleteTextures(1, &position_buffer);
+	glDeleteRenderbuffers(1, &gbuffer_rbo);
+	glDeleteFramebuffers(1, &gbuffer_fbo);
+	return;
+}
 

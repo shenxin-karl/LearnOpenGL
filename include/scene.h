@@ -53,4 +53,5 @@ public:
 	void planet();
 	void point_shadow();
 	void deferred_shading();
+	void SSAO();
 };
