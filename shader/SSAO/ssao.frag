@@ -12,9 +12,15 @@ uniform sampler2D albedo_spec_buffer;
 uniform sampler2D ssao_texture;
 uniform vec3	  light_position;
 uniform vec3	  light_color;
+uniform int		  width;
 
 void main() {
-	// 所有的变量都是在 view 视图空间
+	if (gl_FragCoord.x < (width / 2)) {
+		vec3 color = vec3(texture(ssao_texture, fs_in.texcoord).r);
+		frag_color = vec4(color, 1.0);
+		return;
+	}
+
 	vec3 position    = texture(position_buffer, fs_in.texcoord).xyz;
 	vec3 albedo_diff = texture(albedo_diff_buffer, fs_in.texcoord).rgb;
 	vec3 albedo_spec = texture(albedo_spec_buffer, fs_in.texcoord).rgb;

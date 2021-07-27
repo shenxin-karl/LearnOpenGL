@@ -1691,6 +1691,7 @@ void Scene::SSAO() {
 		{
 			glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 			ssao_shader.use();
+			ssao_shader.set_uniform("width", width);
 			ssao_shader.set_uniform("light_position", view_light_pos);
 			ssao_shader.set_uniform("light_color", light_color);
 			glActiveTexture(GL_TEXTURE0);

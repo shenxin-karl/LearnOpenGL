@@ -4,27 +4,22 @@
 
 1. **blinn-phong 着色模型**
    <img src="readme_resource/blinn-phong.png" alt="blinn-phong" style="zoom:67%;" />
-
 2. **normal mapping 切线空间的法线贴图**
    <img src="readme_resource/normal_mapping.png" alt="normal_mapping" style="zoom:67%;" />
-
 3. **parallax mapping 视差贴图**
    <img src="readme_resource/parallax_mapping.png" alt="parallax_mapping" style="zoom:67%;" />
-
 4. **shadow mapping 定向光阴影映射**
    <img src="readme_resource/shadow_mapping.png" alt="shadow_mapping" style="zoom: 67%;" />
-
 5. **point shadow 点光源阴影映射**
    <img src="readme_resource/poing_shadow.png" alt="poing_shadow" style="zoom:67%;" />
-
 6. **pbr sphere 着色**
    <img src="readme_resource/pbr_sphere.png" alt="pbr_sphere" style="zoom:67%;" />
-
 7. **IBL 环境光**
    <img src="readme_resource/AK47.png" alt="AK47" style="zoom:67%;" />
-
 8. **deferred shading 延迟渲染**
    <img src="readme_resource/deferred_shading.png" alt="deferred_shading" style="zoom:67%;" />
+9. **SSAO(screen space ambinet occlusion) 环境光遮蔽**
+   <img src="SSAO.png" alt="SSAO" style="zoom:67%;" />
 
 ## Build
 
