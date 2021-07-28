@@ -19,7 +19,7 @@
 8. **deferred shading 延迟渲染**
    <img src="readme_resource/deferred_shading.png" alt="deferred_shading" style="zoom:67%;" />
 9. **SSAO(screen space ambinet occlusion) 环境光遮蔽**
-   <img src="SSAO.png" alt="SSAO" style="zoom:67%;" />
+   <img src="readme_resource/SSAO.png" alt="SSAO" style="zoom:67%;" />
 
 ## Build
 
