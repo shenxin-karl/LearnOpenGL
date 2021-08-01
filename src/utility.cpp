@@ -241,3 +241,15 @@ void SSAO(GLFWwindow *window) {
 	scene.SSAO();
 	glfwDestroyWindow(window);
 }
+
+void SSR(GLFWwindow *window) {
+	glm::vec3 look_from(0, 4.5f, -18.f);
+	glm::vec3 look_up(0, 1, 0);
+	glm::vec3 look_at(0, -10, 0);
+	std::shared_ptr<Camera> camera_ptr = std::make_shared<Camera>(look_from, look_up, g_fov, g_near, g_far, 0.1f, 5.f);
+	camera_ptr->set_aspect(g_aspect);
+	camera_ptr->init_euler_angle(-2.0, 92.f);
+	Scene scene(window, camera_ptr, g_width, g_height, g_near, g_far);
+	scene.SSR();
+	glfwDestroyWindow(window);
+}

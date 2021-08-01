@@ -486,8 +486,8 @@ GLuint Loader::prefilter(GLuint env_map, int width /*= 512*/, int height /*= 512
 		glBindTexture(GL_TEXTURE_CUBE_MAP, env_map);
 		constexpr int max_mip_level = 5;
 		for (int mip = 0; mip < max_mip_level; ++mip) {
-			int mip_width = width * std::pow(0.5, mip);
-			int mip_height = height * std::pow(0.5, mip);
+			int mip_width = static_cast<int>(width * std::pow(0.5, mip));
+			int mip_height = static_cast<int>(height * std::pow(0.5, mip));
 			glBindRenderbuffer(GL_RENDERBUFFER, rbo);
 			glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, mip_width, mip_height);
 			glViewport(0, 0, mip_width, mip_height);

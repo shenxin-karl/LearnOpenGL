@@ -1745,3 +1745,58 @@ void Scene::SSAO() {
 	return;
 }
 
+void Scene::SSR() {
+	auto cube_ptr = Loader::create_trest_cube();
+	auto plane_ptr = Loader::create_test_plane();
+	Shader gbuffer_shader("shader/SSR/gbuffer.vert", "shader/SSR/gbuffer.vert");
+	Shader ssr_shader("shader/SSR/ssr.vert", "shader/SSR/ssr.frag");
+
+	GLuint gbuffer_fbo;
+	GLuint gbuffer_rbo;
+	GLuint position_buffer;
+	GLuint normal_buffer;
+	GLuint albedo_buffer;
+	glGenFramebuffers(1, &gbuffer_fbo);
+	{
+		glGenTextures(1, &position_buffer);
+		glBindTexture(GL_TEXTURE_2D, position_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		glGenTextures(1, &normal_buffer);
+		glBindTexture(GL_TEXTURE_2D, normal_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		glGenTextures(1, &albedo_buffer);
+		glBindTexture(GL_TEXTURE_2D, albedo_buffer);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGB, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+		glGenRenderbuffers(1, &gbuffer_rbo);
+		glBindRenderbuffer(GL_RENDERBUFFER, gbuffer_rbo);
+		glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+		glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, gbuffer_rbo);
+
+		GLuint attachment[] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+		glDrawBuffers(3, attachment);
+	}
+	glBindFramebuffer(1, 0);
+
+	while (!glfwWindowShouldClose(window)) {
+		poll_event();
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		swap_buffer();
+	}
+
+	glDeleteTextures(1, &albedo_buffer);
+	glDeleteTextures(1, &normal_buffer);
+	glDeleteTextures(1, &position_buffer);
+	glDeleteRenderbuffers(1, &gbuffer_rbo);
+	glDeleteFramebuffers(1, &gbuffer_fbo);
+}
+

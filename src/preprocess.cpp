@@ -90,7 +90,7 @@ std::string Preprocess::trim_space(std::string &&str) {
 		return str;
 
 	int start = 0;
-	int last = str.size() - 1;
+	int last = static_cast<int>(str.size()) - 1;
 	while (start < str.size() && str[start] == ' ')
 		++start;
 	while (last > start && str[last] == ' ')
